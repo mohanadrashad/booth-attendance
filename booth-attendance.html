@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>تسجيل حضور البوث</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0f1a;
+    --card: #111827;
+    --card-border: #1e293b;
+    --accent: #10b981;
+    --accent-glow: rgba(16, 185, 129, 0.15);
+    --accent-soft: #065f46;
+    --danger: #ef4444;
+    --text: #f1f5f9;
+    --text-dim: #94a3b8;
+    --text-muted: #475569;
+    --absent-bg: #1a1a2e;
+    --present-bg: #052e16;
+    --present-border: #166534;
+    --signature-bg: #0f172a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Tajawal', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  .header {
+    background: linear-gradient(135deg, #064e3b 0%, #0a0f1a 100%);
+    padding: 28px 20px 24px;
+    text-align: center;
+    border-bottom: 1px solid var(--card-border);
+    position: relative;
+    overflow: visible;
+  }
+
+  .menu-btn {
+    position: absolute;
+    top: 24px;
+    left: 16px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text);
+    font-size: 22px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 10;
+    font-family: 'Tajawal', sans-serif;
+    letter-spacing: 1px;
+  }
+
+  .menu-btn:active {
+    background: rgba(255,255,255,0.15);
+  }
+
+  .menu-dropdown {
+    display: none;
+    position: absolute;
+    top: 68px;
+    left: 16px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 6px;
+    z-index: 20;
+    min-width: 200px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    animation: fadeIn 0.15s ease;
+  }
+
+  .menu-dropdown.active {
+    display: block;
+  }
+
+  .menu-dropdown button {
+    display: block;
+    width: 100%;
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: 'Tajawal', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: right;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+
+  .menu-dropdown button:hover,
+  .menu-dropdown button:active {
+    background: rgba(255,255,255,0.06);
+  }
+
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at 30% 50%, rgba(16,185,129,0.08) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .header h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+
+  .header p {
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  .stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 16px 20px;
+    background: var(--card);
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-num {
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .stat-num.green { color: var(--accent); }
+  .stat-num.red { color: var(--danger); }
+  .stat-num.white { color: var(--text); }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  .staff-list {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .staff-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .staff-card:active {
+    transform: scale(0.98);
+  }
+
+  .staff-card.present {
+    background: var(--present-bg);
+    border-color: var(--present-border);
+    cursor: default;
+  }
+
+  .staff-card.present::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 0 4px 4px 0;
+  }
+
+  .staff-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .staff-card:not(.present) .avatar {
+    background: linear-gradient(135deg, #1e293b, #334155);
+  }
+
+  .staff-card.present .avatar {
+    background: linear-gradient(135deg, var(--accent), #059669);
+  }
+
+  .staff-name {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .staff-time {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .status-badge {
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+
+  .staff-card:not(.present) .status-badge {
+    background: rgba(239, 68, 68, 0.1);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+
+  .staff-card.present .status-badge {
+    background: rgba(16, 185, 129, 0.1);
+    color: #6ee7b7;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+  }
+
+  /* Signature Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+    align-items: flex-end;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+  }
+
+  .modal-overlay.active {
+    display: flex;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal {
+    background: var(--card);
+    border-radius: 24px 24px 0 0;
+    width: 100%;
+    max-width: 500px;
+    padding: 24px 20px 32px;
+    animation: slideUp 0.3s ease;
+    border: 1px solid var(--card-border);
+    border-bottom: none;
+  }
+
+  .modal-handle {
+    width: 36px;
+    height: 4px;
+    background: var(--text-muted);
+    border-radius: 4px;
+    margin: 0 auto 20px;
+  }
+
+  .modal h2 {
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  .modal p {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+
+  .signature-area {
+    background: var(--signature-bg);
+    border: 2px dashed var(--card-border);
+    border-radius: 16px;
+    height: 180px;
+    position: relative;
+    margin-bottom: 16px;
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  .signature-area canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .signature-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .signature-placeholder.hidden {
+    opacity: 0;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn:active {
+    transform: scale(0.97);
+  }
+
+  .btn-confirm {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-confirm:disabled {
+    background: #1e3a2f;
+    color: #4a7c6a;
+    cursor: not-allowed;
+  }
+
+  .btn-cancel {
+    background: #1e293b;
+    color: var(--text-dim);
+  }
+
+  .btn-clear {
+    background: none;
+    border: 1px solid var(--card-border);
+    color: var(--text-dim);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    margin-bottom: 16px;
+    display: block;
+    margin-right: auto;
+  }
+
+
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    background: var(--accent);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 14px;
+    z-index: 200;
+    transition: transform 0.3s ease;
+    white-space: nowrap;
+  }
+
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .sig-preview {
+    width: 40px;
+    height: 28px;
+    border-radius: 6px;
+    object-fit: contain;
+    margin-right: 8px;
+    background: var(--signature-bg);
+    padding: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <button class="menu-btn" onclick="toggleMenu(event)">⋮</button>
+  <div class="menu-dropdown" id="menuDropdown">
+    <button onclick="exportData(); toggleMenu(event);">📋 تصدير البيانات</button>
+    <button onclick="resetAll(); toggleMenu(event);">🔄 إعادة تعيين الكل</button>
+  </div>
+  <h1>تسجيل حضور البوث</h1>
+  <p id="eventDate"></p>
+</div>
+
+<div class="stats-bar" id="statsBar">
+  <div class="stat">
+    <div class="stat-num white" id="totalCount">0</div>
+    <div class="stat-label">الإجمالي</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num green" id="presentCount">0</div>
+    <div class="stat-label">حاضر</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num red" id="absentCount">0</div>
+    <div class="stat-label">غائب</div>
+  </div>
+</div>
+
+<div class="staff-list" id="staffList"></div>
+
+
+
+<!-- Signature Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2 id="modalName"></h2>
+    <p>وقّع هنا لتأكيد الحضور</p>
+    <div class="signature-area" id="signatureArea">
+      <canvas id="sigCanvas"></canvas>
+      <div class="signature-placeholder" id="sigPlaceholder">✍️ ارسم توقيعك هنا</div>
+    </div>
+    <button class="btn-clear" onclick="clearSignature()">مسح التوقيع</button>
+    <div class="modal-actions">
+      <button class="btn btn-confirm" id="btnConfirm" disabled onclick="confirmAttendance()">تأكيد الحضور ✓</button>
+      <button class="btn btn-cancel" onclick="closeModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ===== غيّر الأسماء هنا =====
+  const STAFF = [
+    { id: 1, name: 'أحمد العتيبي' },
+    { id: 2, name: 'سارة القحطاني' },
+    { id: 3, name: 'فهد الشمري' },
+    { id: 4, name: 'نورة الدوسري' },
+    { id: 5, name: 'خالد المطيري' },
+    { id: 6, name: 'ريم الحربي' },
+  ];
+  // ============================
+
+  let attendance = {};
+  let currentStaffId = null;
+  let isDrawing = false;
+  let hasDrawn = false;
+  let canvas, ctx;
+
+  function init() {
+    // Set date
+    const now = new Date();
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    document.getElementById('eventDate').textContent = now.toLocaleDateString('ar-SA', options);
+
+    renderStaff();
+    updateStats();
+    initCanvas();
+  }
+
+  function getInitials(name) {
+    const parts = name.split(' ');
+    return parts.length > 1 ? parts[0][0] + parts[1][0] : parts[0][0];
+  }
+
+  function renderStaff() {
+    const list = document.getElementById('staffList');
+    list.innerHTML = '';
+
+    STAFF.forEach(s => {
+      const record = attendance[s.id];
+      const isPresent = !!record;
+
+      const card = document.createElement('div');
+      card.className = `staff-card ${isPresent ? 'present' : ''}`;
+      if (!isPresent) {
+        card.onclick = () => openModal(s.id);
+      }
+
+      const sigImg = isPresent && record.signature 
+        ? `<img class="sig-preview" src="${record.signature}" alt="توقيع">` 
+        : '';
+
+      card.innerHTML = `
+        <div class="staff-info">
+          <div class="avatar">${getInitials(s.name)}</div>
+          <div>
+            <div class="staff-name">${s.name}</div>
+            <div class="staff-time">${isPresent ? '✓ وصل الساعة ' + record.time : 'لم يسجل بعد'}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;">
+          ${sigImg}
+          <div class="status-badge">${isPresent ? 'حاضر' : 'غائب'}</div>
+        </div>
+      `;
+
+      list.appendChild(card);
+    });
+  }
+
+  function updateStats() {
+    const total = STAFF.length;
+    const present = Object.keys(attendance).length;
+    document.getElementById('totalCount').textContent = total;
+    document.getElementById('presentCount').textContent = present;
+    document.getElementById('absentCount').textContent = total - present;
+  }
+
+  // Canvas / Signature
+  function initCanvas() {
+    canvas = document.getElementById('sigCanvas');
+    ctx = canvas.getContext('2d');
+
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDraw);
+    canvas.addEventListener('mouseleave', stopDraw);
+
+    canvas.addEventListener('touchstart', handleTouch, { passive: false });
+    canvas.addEventListener('touchmove', handleTouch, { passive: false });
+    canvas.addEventListener('touchend', stopDraw);
+  }
+
+  function resizeCanvas() {
+    const area = document.getElementById('signatureArea');
+    const rect = area.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  }
+
+  function handleTouch(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    if (e.type === 'touchstart') {
+      isDrawing = true;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      onFirstDraw();
+    } else if (e.type === 'touchmove' && isDrawing) {
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+  }
+
+  function startDraw(e) {
+    isDrawing = true;
+    const rect = canvas.getBoundingClientRect();
+    ctx.beginPath();
+    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    onFirstDraw();
+  }
+
+  function draw(e) {
+    if (!isDrawing) return;
+    const rect = canvas.getBoundingClientRect();
+    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+    ctx.stroke();
+  }
+
+  function stopDraw() {
+    isDrawing = false;
+  }
+
+  function onFirstDraw() {
+    if (!hasDrawn) {
+      hasDrawn = true;
+      document.getElementById('sigPlaceholder').classList.add('hidden');
+      document.getElementById('btnConfirm').disabled = false;
+    }
+  }
+
+  function clearSignature() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    hasDrawn = false;
+    document.getElementById('sigPlaceholder').classList.remove('hidden');
+    document.getElementById('btnConfirm').disabled = true;
+  }
+
+  // Modal
+  function openModal(id) {
+    currentStaffId = id;
+    const staff = STAFF.find(s => s.id === id);
+    document.getElementById('modalName').textContent = staff.name;
+    document.getElementById('modalOverlay').classList.add('active');
+
+    setTimeout(() => {
+      resizeCanvas();
+      clearSignature();
+    }, 100);
+  }
+
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('active');
+    currentStaffId = null;
+    clearSignature();
+  }
+
+  function confirmAttendance() {
+    if (!currentStaffId || !hasDrawn) return;
+
+    const now = new Date();
+    const time = now.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+    const sigData = canvas.toDataURL('image/png');
+
+    attendance[currentStaffId] = {
+      time: time,
+      signature: sigData,
+      timestamp: now.toISOString()
+    };
+
+    closeModal();
+    renderStaff();
+    updateStats();
+
+    const staff = STAFF.find(s => s.id === currentStaffId);
+    showToast(`✓ تم تسجيل حضور ${staff.name}`);
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+  }
+
+  // Menu
+  function toggleMenu(e) {
+    e.stopPropagation();
+    document.getElementById('menuDropdown').classList.toggle('active');
+  }
+
+  document.addEventListener('click', function() {
+    document.getElementById('menuDropdown').classList.remove('active');
+  });
+
+  function resetAll() {
+    if (confirm('هل أنت متأكد من إعادة تعيين جميع البيانات؟')) {
+      attendance = {};
+      renderStaff();
+      updateStats();
+      showToast('تم إعادة التعيين ✓');
+    }
+  }
+
+  // Export
+  function exportData() {
+    const now = new Date();
+    let text = `📋 تقرير حضور البوث\n`;
+    text += `التاريخ: ${now.toLocaleDateString('ar-SA')}\n`;
+    text += `═══════════════════════\n\n`;
+
+    let presentCount = 0;
+
+    STAFF.forEach(s => {
+      const record = attendance[s.id];
+      if (record) {
+        presentCount++;
+        text += `✅ ${s.name} — وصل ${record.time}\n`;
+      } else {
+        text += `❌ ${s.name} — غائب\n`;
+      }
+    });
+
+    text += `\n═══════════════════════\n`;
+    text += `الحضور: ${presentCount} / ${STAFF.length}\n`;
+
+    if (navigator.share) {
+      navigator.share({ title: 'تقرير حضور البوث', text: text });
+    } else {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('تم نسخ التقرير ✓');
+      });
+    }
+  }
+
+  // Close modal on overlay click
+  document.getElementById('modalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  init();
+</script>
+</body>
+</html>
