@@ -27,6 +27,10 @@
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
+  html, body {
+    overflow-x: hidden;
+  }
+
   body {
     font-family: 'Tajawal', sans-serif;
     background: var(--bg);
@@ -112,11 +116,8 @@
   .header::before {
     content: '';
     position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle at 30% 50%, rgba(16,185,129,0.08) 0%, transparent 50%);
+    inset: 0;
+    background: radial-gradient(circle at 30% 50%, rgba(16,185,129,0.08) 0%, transparent 70%);
     pointer-events: none;
   }
 
