@@ -594,7 +594,7 @@
   <button class="menu-btn" onclick="toggleMenu(event)">⋮</button>
   <div class="menu-dropdown" id="menuDropdown">
     <button onclick="exportData(); toggleMenu(event);">📋 تصدير البيانات</button>
-    <button onclick="resetAll(); toggleMenu(event);">🔄 إعادة تعيين الكل</button>
+
     <a href="dashboard.html" style="display:block;width:100%;padding:12px 16px;color:var(--text);font-family:'Tajawal',sans-serif;font-size:14px;font-weight:500;text-align:right;text-decoration:none;border-radius:8px;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background=''">⚙️ لوحة التحكم</a>
   </div>
   <h1>تسجيل حضور البوث</h1>
@@ -1168,17 +1168,7 @@
     document.getElementById('menuDropdown').classList.remove('active');
   });
 
-  // T024: Clears in-memory attendance state only — does NOT delete records from the database
-  function resetAll() {
-    if (confirm('هل أنت متأكد من إعادة تعيين جميع البيانات؟')) {
-      attendance = {};
-      renderStaff();
-      updateStats();
-      showToast('تم إعادة التعيين ✓');
-    }
-  }
-
-  // Export — T022+T023 (US5): uses currentEvent name; guards against missing event
+// Export — T022+T023 (US5): uses currentEvent name; guards against missing event
   function exportData() {
     // T023: Guard — no active event
     if (!currentEvent) {
