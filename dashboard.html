@@ -1597,12 +1597,10 @@
     document.getElementById('attendanceTableContainer').innerHTML =
       '<div class="loading-state">جارٍ التحميل...</div>';
 
-    const pickedDate = picker.value;
     const { data, error } = await _supabase
       .from('attendance')
-      .select('id, checked_in_at, checked_out_at, staff:staff_id(name)')
+      .select('id, checked_in_at, checked_out_at, attendance_date, staff:staff_id(name)')
       .eq('event_id', selectedEventId)
-      .eq('attendance_date', pickedDate)
       .order('checked_in_at')
       .limit(200);
 
@@ -1622,17 +1620,22 @@
     const selectedEvent = EVENTS.find(e => e.id === selectedEventId);
     const startTime = selectedEvent ? selectedEvent.start_time : null;
 
-    const filtered = attendanceSearch
-      ? ATTENDANCE.filter(r => r.staff && r.staff.name && r.staff.name.includes(attendanceSearch))
+    const pickedDate = document.getElementById('attendanceDayPicker').value;
+    const byDay = pickedDate
+      ? ATTENDANCE.filter(r => r.attendance_date === pickedDate)
       : ATTENDANCE;
 
+    const filtered = attendanceSearch
+      ? byDay.filter(r => r.staff && r.staff.name && r.staff.name.includes(attendanceSearch))
+      : byDay;
+
     if (ATTENDANCE.length === 0) {
-      container.innerHTML = '<div class="empty-state">لا توجد سجلات حضور لهذا اليوم</div>';
+      container.innerHTML = '<div class="empty-state">لا توجد سجلات حضور لهذه الفعالية</div>';
       return;
     }
 
     if (filtered.length === 0) {
-      container.innerHTML = '<div class="empty-state">لا توجد نتائج للبحث</div>';
+      container.innerHTML = '<div class="empty-state">لا توجد سجلات حضور لهذا اليوم</div>';
       return;
     }
 
@@ -1674,7 +1677,9 @@
 
   function renderAttendanceStats() {
     const total = STAFF.filter(s => s.is_active).length;
-    const present = ATTENDANCE.length;
+    const pickedDate = document.getElementById('attendanceDayPicker').value;
+    const dayRecords = pickedDate ? ATTENDANCE.filter(r => r.attendance_date === pickedDate) : ATTENDANCE;
+    const present = dayRecords.length;
     const absent = total - present;
     const rate = total === 0 ? 0 : Math.round(present / total * 100);
 
