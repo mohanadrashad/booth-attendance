@@ -299,6 +299,13 @@
     pointer-events: none;
   }
 
+  .no-session-msg {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 60px 20px;
+    font-size: 18px;
+  }
+
   .dept-header {
     font-size: 12px;
     font-weight: 700;
@@ -649,6 +656,9 @@
   // ===== Supabase client — initialized inside init() after config guard =====
   let _supabase = null;
 
+  // ===== Today's date (YYYY-MM-DD) — used for day-scoped attendance =====
+  const TODAY = new Date().toISOString().split('T')[0];
+
   // ===== State variables =====
   // STAFF and currentEvent are loaded from DB on init; attendance is hydrated from DB
   let STAFF = [];
@@ -697,7 +707,7 @@
       // Stage 1: Fetch staff + event in parallel (US1 + US2)
       const [staffResult, eventResult] = await Promise.all([
         _supabase.from('staff').select('id, name, department').eq('is_active', true).order('name'),
-        _supabase.from('events').select('id, name, event_date').eq('is_active', true).maybeSingle()
+        _supabase.from('events').select('id, name, event_date, end_date').eq('is_active', true).maybeSingle()
       ]);
 
       // T013: Handle staff query result (US1)
@@ -711,21 +721,39 @@
       currentEvent = eventResult.data || null;
       const headerDate = document.getElementById('eventDate');
       if (currentEvent) {
-        const d = new Date(currentEvent.event_date + 'T00:00:00');
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        headerDate.textContent = currentEvent.name + ' — ' + d.toLocaleDateString('ar-SA', options);
+        const eventStart = currentEvent.event_date;
+        const eventEnd   = currentEvent.end_date || currentEvent.event_date;
+
+        // Build date range label for header
+        const fmtDate = iso => {
+          const d = new Date(iso + 'T00:00:00');
+          return d.toLocaleDateString('ar-SA', { month: 'long', day: 'numeric' });
+        };
+        const dateLabel = eventStart === eventEnd
+          ? new Date(eventStart + 'T00:00:00').toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+          : fmtDate(eventStart) + ' – ' + new Date(eventEnd + 'T00:00:00').toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' });
+        headerDate.textContent = currentEvent.name + ' — ' + dateLabel;
+
+        // Guard: if today is outside the event's date range, show a message and stop
+        if (TODAY < eventStart || TODAY > eventEnd) {
+          showLoading(false);
+          document.getElementById('staffList').innerHTML =
+            '<p class="no-session-msg">لا توجد جلسة مسجلة لهذا اليوم</p>';
+          return;
+        }
       } else {
         const now = new Date();
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         headerDate.textContent = now.toLocaleDateString('ar-SA', options);
       }
 
-      // Stage 2: Fetch existing attendance for active event (including checkout data)
+      // Stage 2: Fetch existing attendance for today only (day-scoped)
       if (currentEvent) {
         const attResult = await _supabase
           .from('attendance')
           .select('staff_id, checked_in_at, signature_data, id, checked_out_at, exit_signature_data')
-          .eq('event_id', currentEvent.id);
+          .eq('event_id', currentEvent.id)
+          .eq('attendance_date', TODAY);
 
         if (!attResult.error && attResult.data) {
           attResult.data.forEach(record => {
@@ -1052,9 +1080,10 @@
       const { data, error } = await _supabase
         .from('attendance')
         .insert({
-          staff_id: currentStaffId,
-          event_id: currentEvent.id,
-          signature_data: sigData
+          staff_id:        currentStaffId,
+          event_id:        currentEvent.id,
+          signature_data:  sigData,
+          attendance_date: TODAY
         })
         .select('id, checked_in_at')
         .single();

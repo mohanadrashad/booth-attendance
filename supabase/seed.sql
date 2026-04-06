@@ -40,9 +40,13 @@ ON CONFLICT (id) DO UPDATE SET
 -- EVENTS — 1 active sample event
 -- -----------------------------------------------------------------------------
 
-INSERT INTO events (id, name, event_date, is_active) VALUES
-  ('00000000-0000-0000-0000-000000000101', 'معرض الكتاب 2026', '2026-04-04', true)
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO events (id, name, event_date, end_date, is_active) VALUES
+  ('00000000-0000-0000-0000-000000000101', 'معرض الكتاب 2026', '2026-04-04', '2026-04-06', true)
+ON CONFLICT (id) DO UPDATE SET
+  name       = EXCLUDED.name,
+  event_date = EXCLUDED.event_date,
+  end_date   = EXCLUDED.end_date,
+  is_active  = EXCLUDED.is_active;
 
 -- -----------------------------------------------------------------------------
 -- SETTINGS — default configuration row

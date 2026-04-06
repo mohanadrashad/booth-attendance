@@ -742,6 +742,29 @@
     color: var(--text-muted);
     margin-top: 2px;
   }
+  .reactivate-btn {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    color: #34d399;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .reactivate-btn:hover { background: rgba(16, 185, 129, 0.25); }
+  .cancel-attendance-btn {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #f87171;
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .cancel-attendance-btn:hover { background: rgba(239, 68, 68, 0.25); }
 </style>
 </head>
 <body>
@@ -802,6 +825,7 @@
     <div id="attendanceStats" class="stats-row"></div>
     <div class="attendance-filter">
       <select id="eventSelector" class="event-select"></select>
+      <input id="attendanceDayPicker" class="event-select" type="date" style="width:auto;">
       <input id="attendanceSearchInput" class="search-input" type="text" placeholder="🔍 بحث بالاسم...">
     </div>
     <div id="attendanceTableContainer" class="attendance-table-wrap">
@@ -874,7 +898,8 @@
   <div class="modal">
     <h2 id="eventModalTitle">إنشاء فعالية</h2>
     <input id="eventNameInput" class="modal-input" type="text" placeholder="اسم الفعالية">
-    <input id="eventDateInput" class="modal-input" type="date">
+    <input id="eventDateInput" class="modal-input" type="date" placeholder="تاريخ البداية">
+    <input id="eventEndDate" class="modal-input" type="date" placeholder="تاريخ الانتهاء (اختياري)">
     <input id="eventStartTimeInput" class="modal-input" type="time" placeholder="وقت البدء (اختياري)">
     <div id="eventModalError" class="modal-error hidden"></div>
     <div class="modal-actions">
@@ -1171,7 +1196,7 @@
                <button class="btn-icon" title="تعديل" onclick="openStaffModal('edit', ${JSON.stringify(s).replace(/"/g, '&quot;')})">✏️</button>
                ${s.is_active
                  ? `<button class="btn-icon danger" title="حجب" onclick="showDeleteConfirm('${s.id}')">🚫</button>`
-                 : ''}
+                 : `<button class="reactivate-btn" onclick="confirmReactivate('${s.id}')">تفعيل</button>`}
              </div>`;
 
         card.innerHTML = `
@@ -1307,6 +1332,16 @@
     showToast('تم حجب الموظف ✓');
   }
 
+  async function confirmReactivate(staffId) {
+    if (!confirm('هل تريد تفعيل هذا الموظف مجدداً؟')) return;
+    const { error } = await _supabase.from('staff').update({ is_active: true }).eq('id', staffId);
+    if (error) { showToast('❌ فشل التفعيل، حاول مرة أخرى'); return; }
+    const idx = STAFF.findIndex(s => s.id === staffId);
+    if (idx !== -1) STAFF[idx].is_active = true;
+    renderStaffList();
+    showToast('تم تفعيل الموظف ✓');
+  }
+
   // ===== Events Section (US1, US2) =====
 
   async function loadEvents() {
@@ -1315,7 +1350,7 @@
 
     const { data, error } = await _supabase
       .from('events')
-      .select('id, name, event_date, is_active, start_time')
+      .select('id, name, event_date, end_date, is_active, start_time')
       .order('event_date', { ascending: false });
 
     if (error) {
@@ -1365,7 +1400,7 @@
       card.innerHTML = `
         <div class="event-info">
           <div class="event-name">${ev.name}</div>
-          <div class="event-date">${formatDate(ev.event_date)}${ev.start_time ? ' · ' + ev.start_time.slice(0,5) : ''}</div>
+          <div class="event-date">${ev.end_date && ev.end_date !== ev.event_date ? formatDate(ev.event_date) + ' – ' + formatDate(ev.end_date) : formatDate(ev.event_date)}${ev.start_time ? ' · ' + ev.start_time.slice(0,5) : ''}</div>
           <span class="event-status ${ev.is_active ? 'active' : 'inactive'}">${ev.is_active ? 'نشطة' : 'غير نشطة'}</span>
         </div>
         ${actionsHTML}
@@ -1382,6 +1417,7 @@
       mode === 'add' ? 'إنشاء فعالية' : 'تعديل الفعالية';
     document.getElementById('eventNameInput').value = ev ? ev.name : '';
     document.getElementById('eventDateInput').value = ev ? (ev.event_date || '') : '';
+    document.getElementById('eventEndDate').value = ev ? (ev.end_date || '') : '';
     document.getElementById('eventStartTimeInput').value = ev ? (ev.start_time ? ev.start_time.slice(0,5) : '') : '';
     document.getElementById('eventModalError').classList.add('hidden');
     document.getElementById('eventModalError').textContent = '';
@@ -1402,6 +1438,7 @@
   async function submitEventModal() {
     const name = document.getElementById('eventNameInput').value.trim();
     const eventDate = document.getElementById('eventDateInput').value;
+    const endDate = document.getElementById('eventEndDate').value || null;
     const startTimeRaw = document.getElementById('eventStartTimeInput').value.trim();
     const startTime = startTimeRaw || null;
     const errorEl = document.getElementById('eventModalError');
@@ -1412,7 +1449,7 @@
       return;
     }
     if (!eventDate) {
-      errorEl.textContent = 'يرجى تحديد تاريخ الفعالية';
+      errorEl.textContent = 'يرجى تحديد تاريخ البداية';
       errorEl.classList.remove('hidden');
       return;
     }
@@ -1423,8 +1460,8 @@
     if (eventModalMode === 'add') {
       const { data, error } = await _supabase
         .from('events')
-        .insert({ name, event_date: eventDate, start_time: startTime })
-        .select('id, name, event_date, is_active, start_time')
+        .insert({ name, event_date: eventDate, end_date: endDate, start_time: startTime })
+        .select('id, name, event_date, end_date, is_active, start_time')
         .single();
 
       if (error) {
@@ -1443,9 +1480,9 @@
     } else if (eventModalMode === 'edit') {
       const { data, error } = await _supabase
         .from('events')
-        .update({ name, event_date: eventDate, start_time: startTime })
+        .update({ name, event_date: eventDate, end_date: endDate, start_time: startTime })
         .eq('id', editEventId)
-        .select('id, name, event_date, is_active, start_time')
+        .select('id, name, event_date, end_date, is_active, start_time')
         .single();
 
       if (error) {
@@ -1542,13 +1579,30 @@
     // Wire selector change (idempotent — remove then add)
     selector.onchange = e => { selectedEventId = e.target.value; loadAttendance(); };
 
+    // Set up day picker within the selected event's date range
+    const selectedEvent = EVENTS.find(e => e.id === selectedEventId);
+    const picker = document.getElementById('attendanceDayPicker');
+    if (selectedEvent) {
+      picker.min = selectedEvent.event_date;
+      picker.max = selectedEvent.end_date || selectedEvent.event_date;
+      const todayStr = new Date().toISOString().split('T')[0];
+      // If picker already has a valid value within range, keep it; else default to today or start
+      const currentVal = picker.value;
+      if (!currentVal || currentVal < picker.min || currentVal > picker.max) {
+        picker.value = (todayStr >= picker.min && todayStr <= picker.max) ? todayStr : picker.min;
+      }
+    }
+    picker.onchange = () => loadAttendance();
+
     document.getElementById('attendanceTableContainer').innerHTML =
       '<div class="loading-state">جارٍ التحميل...</div>';
 
+    const pickedDate = picker.value;
     const { data, error } = await _supabase
       .from('attendance')
       .select('id, checked_in_at, checked_out_at, staff:staff_id(name)')
       .eq('event_id', selectedEventId)
+      .eq('attendance_date', pickedDate)
       .order('checked_in_at')
       .limit(200);
 
@@ -1573,7 +1627,7 @@
       : ATTENDANCE;
 
     if (ATTENDANCE.length === 0) {
-      container.innerHTML = '<div class="empty-state">لا توجد سجلات حضور لهذه الفعالية</div>';
+      container.innerHTML = '<div class="empty-state">لا توجد سجلات حضور لهذا اليوم</div>';
       return;
     }
 
@@ -1594,6 +1648,7 @@
         <td>${name}</td>
         <td>${timeStr}${late ? '<span class="late-badge">متأخر</span>' : ''}</td>
         <td>${checkoutStr}</td>
+        <td><button class="cancel-attendance-btn" onclick="cancelAttendance('${r.id}')">إلغاء</button></td>
       </tr>`;
     }).join('');
 
@@ -1602,11 +1657,19 @@
 
     container.innerHTML = `
       <table class="attendance-table">
-        <thead><tr><th>الاسم</th><th>وقت الحضور</th><th>وقت الانصراف</th></tr></thead>
+        <thead><tr><th>الاسم</th><th>وقت الحضور</th><th>وقت الانصراف</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       ${capNote}
     `;
+  }
+
+  async function cancelAttendance(recordId) {
+    if (!confirm('هل تريد إلغاء هذا الحضور؟ لا يمكن التراجع.')) return;
+    const { error } = await _supabase.from('attendance').delete().eq('id', recordId);
+    if (error) { showToast('حدث خطأ أثناء الإلغاء'); return; }
+    await loadAttendance();
+    showToast('تم إلغاء الحضور ✓');
   }
 
   function renderAttendanceStats() {
