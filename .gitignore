@@ -1,0 +1,13 @@
+# config.js intentionally committed (Supabase anon key is public-safe)
+# config.example.js is the template
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/
+.idea/
+
+# Logs
+*.log

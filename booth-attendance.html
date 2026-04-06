@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>تسجيل حضور البوث</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
 <style>
   :root {
     --bg: #0a0f1a;
@@ -160,8 +162,61 @@
     margin-top: 4px;
   }
 
+  /* Department tab bar */
+  .dept-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--card-border);
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .dept-tabs::-webkit-scrollbar { display: none; }
+
+  .dept-tab {
+    flex-shrink: 0;
+    padding: 8px 18px;
+    border-radius: 20px;
+    border: 1px solid var(--card-border);
+    background: var(--card);
+    color: var(--text-dim);
+    font-family: 'Tajawal', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .dept-tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+
+  /* Search bar */
+  .search-bar {
+    padding: 12px 16px 4px;
+  }
+  .search-input-field {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: 'Tajawal', sans-serif;
+    font-size: 15px;
+    padding: 12px 16px;
+    outline: none;
+    transition: border-color 0.2s;
+    direction: rtl;
+  }
+  .search-input-field:focus { border-color: var(--accent); }
+  .search-input-field::placeholder { color: var(--text-muted); }
+
   .staff-list {
-    padding: 16px;
+    padding: 12px 16px 16px;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -188,7 +243,7 @@
   .staff-card.present {
     background: var(--present-bg);
     border-color: var(--present-border);
-    cursor: default;
+    cursor: pointer;
   }
 
   .staff-card.present::before {
@@ -200,6 +255,58 @@
     height: 100%;
     background: var(--accent);
     border-radius: 0 4px 4px 0;
+  }
+
+  .staff-card.departed {
+    background: #1a1200;
+    border-color: #78350f;
+    pointer-events: none;
+    opacity: 0.85;
+    cursor: default;
+  }
+
+  .staff-card.departed::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4px;
+    height: 100%;
+    background: #f59e0b;
+    border-radius: 0 4px 4px 0;
+  }
+
+  .staff-card.departed .avatar {
+    background: linear-gradient(135deg, #78350f, #92400e);
+  }
+
+  .staff-card.departed .status-badge {
+    background: rgba(245, 158, 11, 0.1);
+    color: #fde68a;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+  }
+
+  .checkout-btn {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #fbbf24;
+    font-size: 12px;
+    font-weight: 600;
+    pointer-events: none;
+  }
+
+  .dept-header {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    padding: 14px 4px 6px;
+    margin-top: 4px;
+    border-bottom: 1px solid var(--card-border);
   }
 
   .staff-info {
@@ -435,6 +542,43 @@
     background: var(--signature-bg);
     padding: 2px;
   }
+
+  .hidden { display: none !important; }
+
+  .loading-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 20px;
+    color: var(--text-muted);
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  .error-message {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--danger);
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  .fatal-error {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--danger);
+    font-size: 15px;
+    font-weight: 500;
+    direction: rtl;
+  }
+
+  .no-event-msg {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+    font-size: 15px;
+    font-weight: 500;
+  }
 </style>
 </head>
 <body>
@@ -444,6 +588,7 @@
   <div class="menu-dropdown" id="menuDropdown">
     <button onclick="exportData(); toggleMenu(event);">📋 تصدير البيانات</button>
     <button onclick="resetAll(); toggleMenu(event);">🔄 إعادة تعيين الكل</button>
+    <a href="dashboard.html" style="display:block;width:100%;padding:12px 16px;color:var(--text);font-family:'Tajawal',sans-serif;font-size:14px;font-weight:500;text-align:right;text-decoration:none;border-radius:8px;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background=''">⚙️ لوحة التحكم</a>
   </div>
   <h1>تسجيل حضور البوث</h1>
   <p id="eventDate"></p>
@@ -459,12 +604,24 @@
     <div class="stat-label">حاضر</div>
   </div>
   <div class="stat">
+    <div class="stat-num" style="color:#fde68a" id="departedCount">0</div>
+    <div class="stat-label">انصرف</div>
+  </div>
+  <div class="stat">
     <div class="stat-num red" id="absentCount">0</div>
     <div class="stat-label">غائب</div>
   </div>
 </div>
 
-<div class="staff-list" id="staffList"></div>
+<div class="dept-tabs" id="deptTabs"></div>
+
+<div class="search-bar">
+  <input class="search-input-field" id="staffSearch" type="text" placeholder="🔍 ابحث عن اسمك..." autocomplete="off" autocorrect="off" spellcheck="false">
+</div>
+
+<div class="staff-list" id="staffList">
+  <div id="loadingOverlay" class="loading-overlay">جارٍ التحميل...</div>
+</div>
 
 
 
@@ -473,7 +630,7 @@
   <div class="modal">
     <div class="modal-handle"></div>
     <h2 id="modalName"></h2>
-    <p>وقّع هنا لتأكيد الحضور</p>
+    <p id="modalSubtitle">وقّع هنا لتأكيد الحضور</p>
     <div class="signature-area" id="signatureArea">
       <canvas id="sigCanvas"></canvas>
       <div class="signature-placeholder" id="sigPlaceholder">✍️ ارسم توقيعك هنا</div>
@@ -489,32 +646,131 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  // ===== غيّر الأسماء هنا =====
-  const STAFF = [
-    { id: 1, name: 'أحمد العتيبي' },
-    { id: 2, name: 'سارة القحطاني' },
-    { id: 3, name: 'فهد الشمري' },
-    { id: 4, name: 'نورة الدوسري' },
-    { id: 5, name: 'خالد المطيري' },
-    { id: 6, name: 'ريم الحربي' },
-  ];
-  // ============================
+  // ===== Supabase client — initialized inside init() after config guard =====
+  let _supabase = null;
 
+  // ===== State variables =====
+  // STAFF and currentEvent are loaded from DB on init; attendance is hydrated from DB
+  let STAFF = [];
+  let currentEvent = null;
   let attendance = {};
   let currentStaffId = null;
+  let currentAction = 'check-in'; // 'check-in' | 'check-out'
+  let activeDept = 'all';
+  let staffSearchQuery = '';
   let isDrawing = false;
   let hasDrawn = false;
   let canvas, ctx;
 
-  function init() {
-    // Set date
-    const now = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    document.getElementById('eventDate').textContent = now.toLocaleDateString('ar-SA', options);
+  // ===== Helper functions (T005, T006, T007) =====
 
-    renderStaff();
-    updateStats();
-    initCanvas();
+  function showLoading(visible) {
+    document.getElementById('loadingOverlay').classList.toggle('hidden', !visible);
+  }
+
+  function showError(message) {
+    const list = document.getElementById('staffList');
+    list.innerHTML = `<div class="error-message">${message}</div>`;
+  }
+
+  function showFatalError(message) {
+    document.getElementById('staffList').innerHTML =
+      `<div class="fatal-error">⚠️ ${message}</div>`;
+    document.getElementById('statsBar').style.display = 'none';
+  }
+
+  // ===== Async init — loads staff, event, and attendance from DB (T010–T017, T021) =====
+  async function init() {
+    // T011: Config guard — must run before createClient to catch missing config.js
+    if (typeof SUPABASE_URL === 'undefined' || typeof SUPABASE_ANON_KEY === 'undefined') {
+      showFatalError('ملف الإعدادات مفقود. يرجى إنشاء ملف config.js');
+      return;
+    }
+
+    // T004: Initialize client only after confirming credentials exist
+    _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // T012: Show loading indicator
+    showLoading(true);
+
+    try {
+      // Stage 1: Fetch staff + event in parallel (US1 + US2)
+      const [staffResult, eventResult] = await Promise.all([
+        _supabase.from('staff').select('id, name, department').eq('is_active', true).order('name'),
+        _supabase.from('events').select('id, name, event_date').eq('is_active', true).maybeSingle()
+      ]);
+
+      // T013: Handle staff query result (US1)
+      if (staffResult.error) {
+        showError('تعذّر تحميل بيانات الموظفين — تحقق من الاتصال بالإنترنت');
+        return;
+      }
+      STAFF = staffResult.data || [];
+
+      // T014+T015: Handle event query result (US2)
+      currentEvent = eventResult.data || null;
+      const headerDate = document.getElementById('eventDate');
+      if (currentEvent) {
+        const d = new Date(currentEvent.event_date + 'T00:00:00');
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        headerDate.textContent = currentEvent.name + ' — ' + d.toLocaleDateString('ar-SA', options);
+      } else {
+        const now = new Date();
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        headerDate.textContent = now.toLocaleDateString('ar-SA', options);
+      }
+
+      // Stage 2: Fetch existing attendance for active event (including checkout data)
+      if (currentEvent) {
+        const attResult = await _supabase
+          .from('attendance')
+          .select('staff_id, checked_in_at, signature_data, id, checked_out_at, exit_signature_data')
+          .eq('event_id', currentEvent.id);
+
+        if (!attResult.error && attResult.data) {
+          attResult.data.forEach(record => {
+            const d = new Date(record.checked_in_at);
+            const time = d.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+
+            let checkoutTime = null, checkoutSignature = null, checkoutTimestamp = null;
+            if (record.checked_out_at) {
+              const dOut = new Date(record.checked_out_at);
+              checkoutTime = dOut.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+              checkoutSignature = record.exit_signature_data;
+              checkoutTimestamp = record.checked_out_at;
+            }
+
+            attendance[record.staff_id] = {
+              time,
+              signature: record.signature_data,
+              timestamp: record.checked_in_at,
+              recordId: record.id,
+              checkoutTime,
+              checkoutSignature,
+              checkoutTimestamp
+            };
+          });
+        }
+      }
+
+      // Stage 3: Render UI
+      renderDeptTabs();
+      renderStaff();
+      updateStats();
+      initCanvas();
+
+      // Wire search input
+      document.getElementById('staffSearch').addEventListener('input', e => {
+        staffSearchQuery = e.target.value.trim();
+        renderStaff();
+      });
+
+    } catch (e) {
+      showError('حدث خطأ أثناء التحميل — حاول إعادة تحميل الصفحة');
+    } finally {
+      // T012: Hide loading indicator
+      showLoading(false);
+    }
   }
 
   function getInitials(name) {
@@ -522,48 +778,158 @@
     return parts.length > 1 ? parts[0][0] + parts[1][0] : parts[0][0];
   }
 
+  const DEPT_ORDER = [
+    'إدارة الانتماء',
+    'إدارة التطوير التنظيمي',
+    'إدارة التدريب',
+    'إدارة العمليات',
+    'إدارة التوظيف'
+  ];
+
+  function renderDeptTabs() {
+    const bar = document.getElementById('deptTabs');
+    bar.innerHTML = '';
+
+    // "All" tab
+    const allTab = document.createElement('button');
+    allTab.className = 'dept-tab' + (activeDept === 'all' ? ' active' : '');
+    allTab.textContent = 'الكل';
+    allTab.onclick = () => { activeDept = 'all'; renderDeptTabs(); renderStaff(); };
+    bar.appendChild(allTab);
+
+    // One tab per department (only those that have staff)
+    const depts = DEPT_ORDER.filter(d => STAFF.some(s => s.department === d));
+    depts.forEach(dept => {
+      const tab = document.createElement('button');
+      tab.className = 'dept-tab' + (activeDept === dept ? ' active' : '');
+      tab.textContent = dept;
+      tab.onclick = () => { activeDept = dept; renderDeptTabs(); renderStaff(); };
+      bar.appendChild(tab);
+    });
+  }
+
   function renderStaff() {
     const list = document.getElementById('staffList');
     list.innerHTML = '';
 
-    STAFF.forEach(s => {
-      const record = attendance[s.id];
-      const isPresent = !!record;
+    if (!currentEvent) {
+      const msg = document.createElement('div');
+      msg.className = 'no-event-msg';
+      msg.textContent = 'لا يوجد حدث نشط — يرجى التواصل مع المسؤول';
+      list.appendChild(msg);
+      return;
+    }
 
-      const card = document.createElement('div');
-      card.className = `staff-card ${isPresent ? 'present' : ''}`;
-      if (!isPresent) {
-        card.onclick = () => openModal(s.id);
-      }
-
-      const sigImg = isPresent && record.signature 
-        ? `<img class="sig-preview" src="${record.signature}" alt="توقيع">` 
-        : '';
-
-      card.innerHTML = `
-        <div class="staff-info">
-          <div class="avatar">${getInitials(s.name)}</div>
-          <div>
-            <div class="staff-name">${s.name}</div>
-            <div class="staff-time">${isPresent ? '✓ وصل الساعة ' + record.time : 'لم يسجل بعد'}</div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;">
-          ${sigImg}
-          <div class="status-badge">${isPresent ? 'حاضر' : 'غائب'}</div>
-        </div>
-      `;
-
-      list.appendChild(card);
+    // Apply search + department filters
+    const q = staffSearchQuery.trim();
+    let visible = STAFF.filter(s => {
+      const deptMatch = activeDept === 'all' || s.department === activeDept;
+      const searchMatch = !q || s.name.includes(q);
+      return deptMatch && searchMatch;
     });
+
+    if (visible.length === 0) {
+      const msg = document.createElement('div');
+      msg.className = 'no-event-msg';
+      msg.textContent = q ? 'لا توجد نتائج للبحث' : 'لا يوجد موظفون في هذه الإدارة';
+      list.appendChild(msg);
+      return;
+    }
+
+    // Show dept headers only when viewing all departments without search
+    const showHeaders = activeDept === 'all' && !q;
+
+    if (showHeaders) {
+      // Group by department
+      const groups = {};
+      DEPT_ORDER.forEach(d => { groups[d] = []; });
+      visible.forEach(s => {
+        const dept = s.department || 'أخرى';
+        if (!groups[dept]) groups[dept] = [];
+        groups[dept].push(s);
+      });
+
+      Object.entries(groups).forEach(([dept, members]) => {
+        if (members.length === 0) return;
+        const header = document.createElement('div');
+        header.className = 'dept-header';
+        header.textContent = dept;
+        list.appendChild(header);
+        members.forEach(s => appendStaffCard(list, s));
+      });
+    } else {
+      // Flat list for tab view or search results
+      visible.forEach(s => appendStaffCard(list, s));
+    }
+  }
+
+  function appendStaffCard(list, s) {
+    const record = attendance[s.id];
+    const isPresent = !!record;
+    const isDeparted = isPresent && !!record.checkoutTime;
+
+    const card = document.createElement('div');
+    if (isDeparted) {
+      card.className = 'staff-card departed';
+    } else if (isPresent) {
+      card.className = 'staff-card present';
+      card.onclick = () => openModal(s.id, 'check-out');
+    } else {
+      card.className = 'staff-card';
+      card.onclick = () => openModal(s.id, 'check-in');
+    }
+
+    let sigImg = '';
+    if (isDeparted && record.checkoutSignature) {
+      sigImg = `<img class="sig-preview" src="${record.checkoutSignature}" alt="توقيع الخروج">`;
+    } else if (isPresent && record.signature) {
+      sigImg = `<img class="sig-preview" src="${record.signature}" alt="توقيع الدخول">`;
+    }
+
+    let badgeText, timeText, hintText;
+    if (isDeparted) {
+      badgeText = 'انصرف';
+      timeText = `خرج ${record.checkoutTime}`;
+      hintText = '';
+    } else if (isPresent) {
+      badgeText = 'حاضر';
+      timeText = `✓ وصل ${record.time}`;
+      hintText = '<div class="checkout-btn">اضغط لتسجيل انصرافك</div>';
+    } else {
+      badgeText = 'غائب';
+      timeText = 'لم يسجل بعد';
+      hintText = '';
+    }
+
+    card.innerHTML = `
+      <div class="staff-info">
+        <div class="avatar">${getInitials(s.name)}</div>
+        <div>
+          <div class="staff-name">${s.name}</div>
+          <div class="staff-time">${timeText}</div>
+          ${hintText}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;">
+        ${sigImg}
+        <div class="status-badge">${badgeText}</div>
+      </div>
+    `;
+
+    list.appendChild(card);
   }
 
   function updateStats() {
     const total = STAFF.length;
-    const present = Object.keys(attendance).length;
+    let presentCount = 0, departedCount = 0;
+    Object.values(attendance).forEach(r => {
+      if (r.checkoutTime) departedCount++;
+      else presentCount++;
+    });
     document.getElementById('totalCount').textContent = total;
-    document.getElementById('presentCount').textContent = present;
-    document.getElementById('absentCount').textContent = total - present;
+    document.getElementById('presentCount').textContent = presentCount;
+    document.getElementById('departedCount').textContent = departedCount;
+    document.getElementById('absentCount').textContent = total - presentCount - departedCount;
   }
 
   // Canvas / Signature
@@ -645,10 +1011,20 @@
   }
 
   // Modal
-  function openModal(id) {
+  function openModal(id, action) {
     currentStaffId = id;
+    currentAction = action;
     const staff = STAFF.find(s => s.id === id);
     document.getElementById('modalName').textContent = staff.name;
+
+    if (action === 'check-out') {
+      document.getElementById('modalSubtitle').textContent = 'وقّع هنا لتأكيد الانصراف';
+      document.getElementById('btnConfirm').textContent = 'تأكيد الانصراف ✓';
+    } else {
+      document.getElementById('modalSubtitle').textContent = 'وقّع هنا لتأكيد الحضور';
+      document.getElementById('btnConfirm').textContent = 'تأكيد الحضور ✓';
+    }
+
     document.getElementById('modalOverlay').classList.add('active');
 
     setTimeout(() => {
@@ -663,25 +1039,87 @@
     clearSignature();
   }
 
-  function confirmAttendance() {
-    if (!currentStaffId || !hasDrawn) return;
+  // Async confirm — writes to DB first, updates UI only on success
+  async function confirmAttendance() {
+    if (!currentStaffId || !hasDrawn || !currentEvent) return;
 
-    const now = new Date();
-    const time = now.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
     const sigData = canvas.toDataURL('image/png');
-
-    attendance[currentStaffId] = {
-      time: time,
-      signature: sigData,
-      timestamp: now.toISOString()
-    };
-
-    closeModal();
-    renderStaff();
-    updateStats();
+    document.getElementById('btnConfirm').disabled = true;
 
     const staff = STAFF.find(s => s.id === currentStaffId);
-    showToast(`✓ تم تسجيل حضور ${staff.name}`);
+
+    if (currentAction === 'check-in') {
+      const { data, error } = await _supabase
+        .from('attendance')
+        .insert({
+          staff_id: currentStaffId,
+          event_id: currentEvent.id,
+          signature_data: sigData
+        })
+        .select('id, checked_in_at')
+        .single();
+
+      if (error) {
+        document.getElementById('btnConfirm').disabled = false;
+        showToast('❌ فشل تسجيل الحضور، حاول مرة أخرى');
+        return;
+      }
+
+      const d = new Date(data.checked_in_at);
+      const time = d.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+      attendance[currentStaffId] = {
+        time,
+        signature: sigData,
+        timestamp: data.checked_in_at,
+        recordId: data.id,
+        checkoutTime: null,
+        checkoutSignature: null,
+        checkoutTimestamp: null
+      };
+
+      closeModal();
+      renderStaff();
+      updateStats();
+      showToast(`✓ تم تسجيل حضور ${staff.name}`);
+
+    } else if (currentAction === 'check-out') {
+      const record = attendance[currentStaffId];
+      if (!record || !record.recordId) {
+        showToast('❌ لا يوجد سجل حضور لهذا الموظف');
+        document.getElementById('btnConfirm').disabled = false;
+        return;
+      }
+
+      const { data, error } = await _supabase
+        .from('attendance')
+        .update({
+          checked_out_at: new Date().toISOString(),
+          exit_signature_data: sigData
+        })
+        .eq('id', record.recordId)
+        .select('checked_out_at')
+        .single();
+
+      if (error) {
+        document.getElementById('btnConfirm').disabled = false;
+        showToast('❌ فشل تسجيل الانصراف، حاول مرة أخرى');
+        return;
+      }
+
+      const dOut = new Date(data.checked_out_at);
+      const checkoutTime = dOut.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+      attendance[currentStaffId] = {
+        ...record,
+        checkoutTime,
+        checkoutSignature: sigData,
+        checkoutTimestamp: data.checked_out_at
+      };
+
+      closeModal();
+      renderStaff();
+      updateStats();
+      showToast(`✓ تم تسجيل انصراف ${staff.name}`);
+    }
   }
 
   function showToast(msg) {
@@ -701,6 +1139,7 @@
     document.getElementById('menuDropdown').classList.remove('active');
   });
 
+  // T024: Clears in-memory attendance state only — does NOT delete records from the database
   function resetAll() {
     if (confirm('هل أنت متأكد من إعادة تعيين جميع البيانات؟')) {
       attendance = {};
@@ -710,10 +1149,16 @@
     }
   }
 
-  // Export
+  // Export — T022+T023 (US5): uses currentEvent name; guards against missing event
   function exportData() {
+    // T023: Guard — no active event
+    if (!currentEvent) {
+      showToast('لا يوجد حدث نشط للتصدير');
+      return;
+    }
     const now = new Date();
-    let text = `📋 تقرير حضور البوث\n`;
+    // T022: Use event name from DB in report title
+    let text = `📋 تقرير حضور: ${currentEvent.name}\n`;
     text += `التاريخ: ${now.toLocaleDateString('ar-SA')}\n`;
     text += `═══════════════════════\n\n`;
 
@@ -723,7 +1168,11 @@
       const record = attendance[s.id];
       if (record) {
         presentCount++;
-        text += `✅ ${s.name} — وصل ${record.time}\n`;
+        if (record.checkoutTime) {
+          text += `✅ ${s.name} — وصل ${record.time} | غادر ${record.checkoutTime}\n`;
+        } else {
+          text += `✅ ${s.name} — وصل ${record.time}\n`;
+        }
       } else {
         text += `❌ ${s.name} — غائب\n`;
       }
@@ -746,7 +1195,8 @@
     if (e.target === this) closeModal();
   });
 
-  init();
+  // T010 (US1): Run async init after DOM is ready
+  document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>

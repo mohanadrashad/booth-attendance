@@ -1,0 +1,1866 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>لوحة التحكم — البوث</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script>(function(){ if(localStorage.getItem('booth_theme')==='light') document.documentElement.classList.add('light-theme'); })()</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  /* ===== Root Variables (mirrors booth-attendance.html) ===== */
+  :root {
+    --bg: #0a0f1a;
+    --card: #111827;
+    --card-border: #1e293b;
+    --accent: #10b981;
+    --accent-glow: rgba(16, 185, 129, 0.15);
+    --accent-soft: #065f46;
+    --danger: #ef4444;
+    --text: #f1f5f9;
+    --text-dim: #94a3b8;
+    --text-muted: #475569;
+    --inactive-bg: #1a1a2e;
+    --inactive-border: #2d2d44;
+    --signature-bg: #0f172a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  .hidden { display: none !important; }
+
+  body {
+    font-family: 'Tajawal', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ===== Toast ===== */
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    background: var(--accent);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 14px;
+    z-index: 300;
+    transition: transform 0.3s ease;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--danger); }
+
+  /* ===== PIN Screen ===== */
+  .pin-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 40px 24px;
+    gap: 16px;
+  }
+
+  .pin-screen h2 {
+    font-size: 26px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  .pin-screen p {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .pin-input {
+    width: 180px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    color: var(--text);
+    font-family: 'Tajawal', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    text-align: center;
+    padding: 16px;
+    letter-spacing: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .pin-input:focus { border-color: var(--accent); }
+
+  .pin-submit {
+    width: 180px;
+    padding: 14px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .pin-submit:disabled { opacity: 0.35; cursor: not-allowed; }
+  .pin-submit:not(:disabled):active { opacity: 0.85; }
+
+  .pin-error {
+    color: var(--danger);
+    font-size: 14px;
+    font-weight: 500;
+    min-height: 20px;
+    text-align: center;
+  }
+
+  /* ===== Dashboard Header ===== */
+  .header {
+    background: linear-gradient(135deg, #064e3b 0%, #0a0f1a 100%);
+    padding: 22px 20px;
+    border-bottom: 1px solid var(--card-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+  }
+
+  .header h1 {
+    font-size: 20px;
+    font-weight: 800;
+    flex: 1;
+    text-align: center;
+  }
+
+  .header-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--text);
+    font-family: 'Tajawal', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+  .header-btn:active { background: rgba(255,255,255,0.15); }
+
+  /* ===== Toolbar (search + add button) ===== */
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    padding: 14px 16px;
+    background: var(--card);
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  .search-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Tajawal', sans-serif;
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-muted); }
+
+  .btn-add {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 10px 16px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.2s;
+  }
+  .btn-add:active { opacity: 0.85; }
+
+  /* ===== Staff List ===== */
+  .staff-list {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .staff-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .staff-card.inactive {
+    background: var(--inactive-bg);
+    border-color: var(--inactive-border);
+    opacity: 0.7;
+  }
+
+  .staff-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 15px;
+    color: white;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, var(--accent), #059669);
+  }
+
+  .staff-card.inactive .avatar {
+    background: linear-gradient(135deg, #374151, #4b5563);
+  }
+
+  .staff-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .staff-status {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-top: 3px;
+    display: inline-block;
+  }
+
+  .staff-status.active {
+    background: var(--accent-glow);
+    color: var(--accent);
+  }
+
+  .staff-status.inactive {
+    background: rgba(71, 85, 105, 0.3);
+    color: var(--text-muted);
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .btn-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid var(--card-border);
+    background: var(--bg);
+    color: var(--text-dim);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  .btn-icon:active { background: var(--card-border); }
+  .btn-icon.danger:active { color: var(--danger); border-color: var(--danger); }
+
+  /* ===== Inline Delete Confirm ===== */
+  .delete-confirm {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .btn-confirm-delete {
+    background: var(--danger);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .btn-cancel-delete {
+    background: none;
+    border: 1px solid var(--card-border);
+    color: var(--text-dim);
+    border-radius: 8px;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 7px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  /* ===== Empty / Loading States ===== */
+  .empty-state, .loading-state, .error-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-muted);
+    font-size: 15px;
+  }
+  .error-state { color: var(--danger); }
+
+  .fatal-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 40px 24px;
+    text-align: center;
+    color: var(--danger);
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  /* ===== Modal ===== */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 100;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 20px 20px 0 0;
+    padding: 28px 24px 36px;
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .modal h2 {
+    font-size: 18px;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .modal-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: 'Tajawal', sans-serif;
+    font-size: 15px;
+    padding: 14px 16px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .modal-input:focus { border-color: var(--accent); }
+  .modal-input::placeholder { color: var(--text-muted); }
+
+  .modal-error {
+    color: var(--danger);
+    font-size: 13px;
+    text-align: center;
+    min-height: 18px;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn-primary {
+    flex: 1;
+    padding: 14px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-primary:active { opacity: 0.85; }
+
+  .btn-cancel {
+    flex: 1;
+    padding: 14px;
+    background: none;
+    border: 1px solid var(--card-border);
+    color: var(--text-dim);
+    border-radius: 12px;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  /* ===== Tab Bar ===== */
+  .tab-bar {
+    display: flex;
+    background: var(--card);
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 14px 8px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-family: 'Tajawal', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* ===== Events Section ===== */
+  .event-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .event-card.active-event {
+    border-right: 4px solid var(--accent);
+  }
+
+  .event-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .event-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .event-date {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+
+  .event-status {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-top: 3px;
+    display: inline-block;
+  }
+
+  .event-status.active {
+    background: var(--accent-glow);
+    color: var(--accent);
+  }
+
+  .event-status.inactive {
+    background: rgba(71, 85, 105, 0.3);
+    color: var(--text-muted);
+  }
+
+  .btn-activate {
+    background: none;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: 8px;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s;
+  }
+  .btn-activate:active { background: var(--accent-glow); }
+
+  /* ===== Attendance Section ===== */
+  .stats-row {
+    display: flex;
+    gap: 0;
+    background: var(--card);
+    border-bottom: 1px solid var(--card-border);
+    padding: 12px 16px;
+  }
+
+  .stat-block {
+    flex: 1;
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .attendance-filter {
+    display: flex;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--card);
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  .event-select {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Tajawal', sans-serif;
+    font-size: 13px;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .event-select:focus { border-color: var(--accent); }
+
+  .attendance-table-wrap {
+    padding: 14px 16px;
+    overflow-x: auto;
+  }
+
+  .attendance-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 14px;
+  }
+
+  .attendance-table th {
+    text-align: right;
+    padding: 8px 10px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  .attendance-table td {
+    padding: 10px 10px;
+    border-bottom: 1px solid var(--card-border);
+    color: var(--text);
+  }
+
+  .late-badge {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--danger);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-right: 6px;
+    white-space: nowrap;
+  }
+
+  .cap-note {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 8px 0;
+  }
+
+  /* ===== Light Theme Overrides ===== */
+  .light-theme {
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --card-border: #e2e8f0;
+    --text: #0f172a;
+    --text-dim: #475569;
+    --text-muted: #94a3b8;
+    --inactive-bg: #f1f5f9;
+    --inactive-border: #cbd5e1;
+    --signature-bg: #f8fafc;
+  }
+
+  /* ===== Export Section ===== */
+  .export-preview {
+    padding: 14px 16px;
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+
+  .export-actions {
+    display: flex;
+    gap: 10px;
+    padding: 0 16px 16px;
+    flex-wrap: wrap;
+  }
+
+  .btn-export {
+    flex: 1;
+    min-width: 100px;
+    padding: 12px 16px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    font-family: 'Tajawal', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    transition: opacity 0.2s, background 0.2s;
+  }
+  .btn-export:not(:disabled):active { background: var(--card-border); }
+  .btn-export:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ===== Settings Section ===== */
+  .settings-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 20px;
+    margin: 14px 16px;
+  }
+
+  .settings-card h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .settings-label {
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+
+  /* Toggle switch */
+  .toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-switch .slider {
+    position: absolute;
+    inset: 0;
+    background: var(--card-border);
+    border-radius: 24px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle-switch input:checked + .slider { background: var(--accent); }
+  .toggle-switch .slider::before {
+    position: absolute;
+    content: '';
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .toggle-switch input:checked + .slider::before { transform: translateX(20px); }
+
+  /* Department grouping */
+  .dept-header {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    padding: 14px 4px 6px;
+    margin-top: 4px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .dept-tag {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== PIN Screen (US1) ===== -->
+<div id="pinScreen" class="pin-screen">
+  <h2>🔐 لوحة التحكم</h2>
+  <p>أدخل رمز PIN للوصول</p>
+  <input id="pinInput" class="pin-input" type="password" maxlength="4" inputmode="numeric" placeholder="••••" autocomplete="off" autofocus>
+  <button id="pinSubmit" class="pin-submit" onclick="submitPin()">دخول</button>
+  <div id="pinError" class="pin-error hidden"></div>
+</div>
+
+<!-- ===== Dashboard (US2–US5) ===== -->
+<div id="dashboard" class="hidden">
+  <!-- Header -->
+  <div class="header">
+    <a href="booth-attendance.html" class="header-btn">← الحضور</a>
+    <h1>لوحة التحكم</h1>
+    <button class="header-btn" onclick="logout()">خروج</button>
+  </div>
+
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="staff" onclick="switchTab('staff')">الموظفون</button>
+    <button class="tab-btn" data-tab="events" onclick="switchTab('events')">الفعاليات</button>
+    <button class="tab-btn" data-tab="attendance" onclick="switchTab('attendance')">الحضور</button>
+    <button class="tab-btn" data-tab="export" onclick="switchTab('export')">تصدير</button>
+    <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">الإعدادات</button>
+  </div>
+
+  <!-- ===== Staff Section ===== -->
+  <div id="section-staff" class="tab-section">
+    <!-- Toolbar: search + add -->
+    <div class="toolbar">
+      <input id="searchInput" class="search-input" type="text" placeholder="🔍 بحث عن موظف...">
+      <button class="btn-add" onclick="openStaffModal('add')">إضافة ＋</button>
+    </div>
+
+    <!-- Staff List -->
+    <div id="staffList" class="staff-list">
+      <div class="loading-state">جارٍ التحميل...</div>
+    </div>
+  </div>
+
+  <!-- ===== Events Section ===== -->
+  <div id="section-events" class="tab-section hidden">
+    <div class="toolbar">
+      <button class="btn-add" onclick="openEventModal('add')">إنشاء فعالية ＋</button>
+    </div>
+    <div id="eventsList" class="staff-list">
+      <div class="loading-state">جارٍ التحميل...</div>
+    </div>
+  </div>
+
+  <!-- ===== Attendance Section ===== -->
+  <div id="section-attendance" class="tab-section hidden">
+    <div id="attendanceStats" class="stats-row"></div>
+    <div class="attendance-filter">
+      <select id="eventSelector" class="event-select"></select>
+      <input id="attendanceSearchInput" class="search-input" type="text" placeholder="🔍 بحث بالاسم...">
+    </div>
+    <div id="attendanceTableContainer" class="attendance-table-wrap">
+      <div class="loading-state">جارٍ التحميل...</div>
+    </div>
+  </div>
+
+  <!-- ===== Export Section ===== -->
+  <div id="section-export" class="tab-section hidden">
+    <div class="toolbar">
+      <select id="exportEventSelector" class="event-select"></select>
+    </div>
+    <div id="exportPreview" class="export-preview"></div>
+    <div class="export-actions">
+      <button id="btnExportCSV" class="btn-export" onclick="exportCSV()">تصدير CSV</button>
+      <button id="btnExportText" class="btn-export" onclick="exportText()">تصدير نصي</button>
+      <button id="btnExportPDF" class="btn-export" onclick="exportPDF()">تصدير PDF</button>
+    </div>
+  </div>
+
+  <!-- ===== Settings Section ===== -->
+  <div id="section-settings" class="tab-section hidden">
+    <!-- PIN Change Card -->
+    <div class="settings-card">
+      <h3>تغيير رمز PIN</h3>
+      <input id="currentPinInput" class="modal-input" type="password" maxlength="4" inputmode="numeric" placeholder="رمز PIN الحالي" autocomplete="off">
+      <input id="newPinInput" class="modal-input" type="password" maxlength="4" inputmode="numeric" placeholder="رمز PIN الجديد" autocomplete="new-password" style="margin-top:10px">
+      <input id="confirmPinInput" class="modal-input" type="password" maxlength="4" inputmode="numeric" placeholder="تأكيد رمز PIN الجديد" autocomplete="new-password" style="margin-top:10px">
+      <div id="pinChangeError" class="modal-error hidden" style="margin-top:8px"></div>
+      <button id="btnSavePin" class="btn-primary" onclick="submitPinChange()" style="margin-top:14px" disabled>حفظ</button>
+    </div>
+
+    <!-- Theme Card -->
+    <div class="settings-card">
+      <h3>المظهر</h3>
+      <div class="settings-row">
+        <span class="settings-label">الوضع الفاتح</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Staff Modal (US3, US4) ===== -->
+<div id="staffModal" class="modal-overlay">
+  <div class="modal">
+    <h2 id="modalTitle">إضافة موظف</h2>
+    <input id="staffNameInput" class="modal-input" type="text" placeholder="اسم الموظف">
+    <select id="staffDeptSelect" class="modal-input" style="margin-top:10px;appearance:auto">
+      <option value="">— اختر الإدارة —</option>
+      <option value="إدارة الانتماء">إدارة الانتماء</option>
+      <option value="إدارة التطوير التنظيمي">إدارة التطوير التنظيمي</option>
+      <option value="إدارة التدريب">إدارة التدريب</option>
+      <option value="إدارة العمليات">إدارة العمليات</option>
+      <option value="إدارة التوظيف">إدارة التوظيف</option>
+    </select>
+    <div id="modalError" class="modal-error hidden"></div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="submitStaffModal()">حفظ</button>
+      <button class="btn-cancel" onclick="closeStaffModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Event Modal ===== -->
+<div id="eventModal" class="modal-overlay">
+  <div class="modal">
+    <h2 id="eventModalTitle">إنشاء فعالية</h2>
+    <input id="eventNameInput" class="modal-input" type="text" placeholder="اسم الفعالية">
+    <input id="eventDateInput" class="modal-input" type="date">
+    <input id="eventStartTimeInput" class="modal-input" type="time" placeholder="وقت البدء (اختياري)">
+    <div id="eventModalError" class="modal-error hidden"></div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="submitEventModal()">حفظ</button>
+      <button class="btn-cancel" onclick="closeEventModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Toast ===== -->
+<div id="toast" class="toast"></div>
+
+<script>
+  // ===== Supabase client — initialized inside init() after config guard =====
+  let _supabase = null;
+
+  // ===== State =====
+  let STAFF = [];
+  let searchQuery = '';
+  let modalMode = null;     // 'add' | 'edit'
+  let editStaffId = null;
+  let deleteConfirmId = null;
+
+  let EVENTS = [];
+  let selectedEventId = null;
+  let ATTENDANCE = [];
+  let attendanceSearch = '';
+  let eventModalMode = null;
+  let editEventId = null;
+  let deleteConfirmEventId = null;
+
+  let exportSelectedEventId = null;
+  let exportRecordCount = 0;
+
+  // ===== Utilities =====
+
+  function showToast(message, isError = false) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = 'toast' + (isError ? ' error' : '');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+  }
+
+  function showFatalError(message) {
+    document.body.innerHTML = `<div class="fatal-error">⚠️ ${message}</div>`;
+  }
+
+  // ===== Authentication (US1) =====
+
+  function showPinScreen() {
+    document.getElementById('pinScreen').classList.remove('hidden');
+    document.getElementById('dashboard').classList.add('hidden');
+    document.getElementById('pinInput').value = '';
+    document.getElementById('pinInput').focus();
+    document.getElementById('pinError').classList.add('hidden');
+    document.getElementById('pinError').textContent = '';
+  }
+
+  function showDashboard() {
+    document.getElementById('pinScreen').classList.add('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
+  }
+
+  function showPinError(message) {
+    const el = document.getElementById('pinError');
+    el.textContent = message;
+    el.classList.remove('hidden');
+  }
+
+  async function hashPin(pin) {
+    const data = new TextEncoder().encode(pin);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  async function submitPin() {
+    const pin = document.getElementById('pinInput').value;
+    if (pin.length !== 4) { showPinError('أدخل رمز PIN من 4 أرقام'); return; }
+    if (!_supabase) { showPinError('خطأ: Supabase لم يُحمَّل — تحقق من الاتصال بالإنترنت'); return; }
+
+    const submitBtn = document.getElementById('pinSubmit');
+    submitBtn.disabled = true;
+
+    try {
+      const { data, error } = await _supabase
+        .from('settings')
+        .select('pin_hash')
+        .eq('id', 1)
+        .single();
+
+      if (error || !data) {
+        showPinError('خطأ في قاعدة البيانات: ' + (error ? error.message : 'لا بيانات'));
+        submitBtn.disabled = false;
+        return;
+      }
+
+      const hash = await hashPin(pin);
+      if (hash === data.pin_hash) {
+        sessionStorage.setItem('dashboard_auth', '1');
+        showDashboard();
+        loadStaff();
+        loadEvents();
+      } else {
+        showPinError('رمز PIN غير صحيح');
+        document.getElementById('pinInput').value = '';
+        submitBtn.disabled = false;
+      }
+    } catch (e) {
+      showPinError('خطأ غير متوقع: ' + e.message);
+      submitBtn.disabled = false;
+    }
+  }
+
+  function logout() {
+    sessionStorage.removeItem('dashboard_auth');
+    STAFF = [];
+    EVENTS = [];
+    searchQuery = '';
+    exportSelectedEventId = null;
+    exportRecordCount = 0;
+    selectedEventId = null;
+    showPinScreen();
+  }
+
+  // ===== Tab Navigation =====
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-section').forEach(el => el.classList.add('hidden'));
+    document.getElementById('section-' + tab).classList.remove('hidden');
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    if (tab === 'events') loadEvents();
+    if (tab === 'attendance') loadAttendance();
+    if (tab === 'export') loadExport();
+    if (tab === 'settings') loadSettings();
+  }
+
+  // ===== Init (US1) =====
+
+  async function init() {
+    // Wire PIN input events first — before any network/config failures
+    const pinInput = document.getElementById('pinInput');
+    pinInput.addEventListener('input', () => {
+      document.getElementById('pinSubmit').disabled = pinInput.value.length !== 4;
+      document.getElementById('pinError').classList.add('hidden');
+    });
+    pinInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && pinInput.value.length === 4) submitPin();
+    });
+
+    if (typeof SUPABASE_URL === 'undefined' || typeof SUPABASE_ANON_KEY === 'undefined') {
+      showFatalError('ملف الإعدادات مفقود. يرجى إنشاء ملف config.js');
+      return;
+    }
+
+    _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Wire modal overlay click to close
+    document.getElementById('staffModal').addEventListener('click', function(e) {
+      if (e.target === this) closeStaffModal();
+    });
+    document.getElementById('eventModal').addEventListener('click', function(e) {
+      if (e.target === this) closeEventModal();
+    });
+    document.getElementById('eventNameInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') submitEventModal();
+    });
+
+    // Wire attendance search
+    document.getElementById('attendanceSearchInput').addEventListener('input', e => {
+      attendanceSearch = e.target.value.trim();
+      renderAttendanceTable();
+    });
+
+    // Wire PIN change inputs
+    document.getElementById('newPinInput').addEventListener('input', () => {
+      const v = document.getElementById('newPinInput').value;
+      document.getElementById('btnSavePin').disabled = v.length !== 4;
+    });
+    ['currentPinInput','newPinInput','confirmPinInput'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', e => {
+        if (e.key === 'Enter' && document.getElementById('newPinInput').value.length === 4) submitPinChange();
+      });
+    });
+
+    // Wire search
+    document.getElementById('searchInput').addEventListener('input', e => {
+      searchQuery = e.target.value.trim();
+      renderStaffList();
+    });
+
+    // Wire staff name input Enter key
+    document.getElementById('staffNameInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') submitStaffModal();
+    });
+
+    if (sessionStorage.getItem('dashboard_auth') === '1') {
+      showDashboard();
+      loadStaff();
+      loadEvents();
+    } else {
+      showPinScreen();
+    }
+  }
+
+  // ===== Staff List (US2) =====
+
+  function getInitials(name) {
+    const parts = name.trim().split(' ');
+    return parts.length > 1 ? parts[0][0] + parts[1][0] : parts[0][0];
+  }
+
+  async function loadStaff() {
+    document.getElementById('staffList').innerHTML =
+      '<div class="loading-state">جارٍ التحميل...</div>';
+
+    const { data, error } = await _supabase
+      .from('staff')
+      .select('id, name, is_active, created_at, department')
+      .order('name');
+
+    if (error) {
+      document.getElementById('staffList').innerHTML =
+        '<div class="error-state">تعذّر تحميل بيانات الموظفين</div>';
+      return;
+    }
+
+    STAFF = data || [];
+    renderStaffList();
+  }
+
+  const DEPT_ORDER = [
+    'إدارة الانتماء',
+    'إدارة التطوير التنظيمي',
+    'إدارة التدريب',
+    'إدارة العمليات',
+    'إدارة التوظيف'
+  ];
+
+  function renderStaffList() {
+    const list = document.getElementById('staffList');
+    list.innerHTML = '';
+
+    if (STAFF.length === 0) {
+      list.innerHTML = '<div class="empty-state">لا يوجد موظفون بعد — أضف أول موظف ＋</div>';
+      return;
+    }
+
+    const filtered = searchQuery
+      ? STAFF.filter(s =>
+          s.name.includes(searchQuery) ||
+          (s.department && s.department.includes(searchQuery))
+        )
+      : STAFF;
+
+    if (filtered.length === 0) {
+      list.innerHTML = '<div class="empty-state">لا توجد نتائج للبحث</div>';
+      return;
+    }
+
+    // Group by department in canonical order
+    const groups = {};
+    DEPT_ORDER.forEach(d => { groups[d] = []; });
+    filtered.forEach(s => {
+      const dept = s.department || 'أخرى';
+      if (!groups[dept]) groups[dept] = [];
+      groups[dept].push(s);
+    });
+
+    Object.entries(groups).forEach(([dept, members]) => {
+      if (members.length === 0) return;
+
+      const header = document.createElement('div');
+      header.className = 'dept-header';
+      header.textContent = dept;
+      list.appendChild(header);
+
+      members.forEach(s => {
+        const card = document.createElement('div');
+        card.className = `staff-card${s.is_active ? '' : ' inactive'}`;
+
+        const isConfirming = deleteConfirmId === s.id;
+
+        const actionsHTML = isConfirming
+          ? `<div class="delete-confirm">
+               <button class="btn-confirm-delete" onclick="confirmDelete('${s.id}')">تأكيد الحجب</button>
+               <button class="btn-cancel-delete" onclick="cancelDelete()">إلغاء</button>
+             </div>`
+          : `<div class="card-actions">
+               <button class="btn-icon" title="تعديل" onclick="openStaffModal('edit', ${JSON.stringify(s).replace(/"/g, '&quot;')})">✏️</button>
+               ${s.is_active
+                 ? `<button class="btn-icon danger" title="حجب" onclick="showDeleteConfirm('${s.id}')">🚫</button>`
+                 : ''}
+             </div>`;
+
+        card.innerHTML = `
+          <div class="staff-info">
+            <div class="avatar">${getInitials(s.name)}</div>
+            <div>
+              <div class="staff-name">${s.name}</div>
+              <div class="dept-tag">${s.department || ''}</div>
+              <span class="staff-status ${s.is_active ? 'active' : 'inactive'}">${s.is_active ? 'نشط' : 'غير نشط'}</span>
+            </div>
+          </div>
+          ${actionsHTML}
+        `;
+
+        list.appendChild(card);
+      });
+    });
+  }
+
+  // ===== Staff Modal — Add (US3) + Edit (US4) =====
+
+  function openStaffModal(mode, staff = null) {
+    modalMode = mode;
+    editStaffId = staff ? staff.id : null;
+    document.getElementById('modalTitle').textContent =
+      mode === 'add' ? 'إضافة موظف' : 'تعديل الموظف';
+    document.getElementById('staffNameInput').value = staff ? staff.name : '';
+    document.getElementById('staffDeptSelect').value = staff ? (staff.department || '') : '';
+    document.getElementById('modalError').classList.add('hidden');
+    document.getElementById('modalError').textContent = '';
+    document.getElementById('staffModal').classList.add('active');
+    setTimeout(() => document.getElementById('staffNameInput').focus(), 50);
+  }
+
+  function closeStaffModal() {
+    document.getElementById('staffModal').classList.remove('active');
+    modalMode = null;
+    editStaffId = null;
+    document.getElementById('staffNameInput').value = '';
+    document.getElementById('staffDeptSelect').value = '';
+    document.getElementById('modalError').classList.add('hidden');
+  }
+
+  async function submitStaffModal() {
+    const name = document.getElementById('staffNameInput').value.trim();
+    const department = document.getElementById('staffDeptSelect').value || null;
+    const errorEl = document.getElementById('modalError');
+
+    if (!name) {
+      errorEl.textContent = 'يرجى إدخال اسم الموظف';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    const saveBtn = document.querySelector('#staffModal .btn-primary');
+    saveBtn.disabled = true;
+
+    if (modalMode === 'add') {
+      const { data, error } = await _supabase
+        .from('staff')
+        .insert({ name, department })
+        .select('id, name, is_active, created_at, department')
+        .single();
+
+      if (error) {
+        errorEl.textContent = 'فشل الحفظ، حاول مرة أخرى';
+        errorEl.classList.remove('hidden');
+        saveBtn.disabled = false;
+        return;
+      }
+
+      STAFF.push(data);
+      STAFF.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+      closeStaffModal();
+      renderStaffList();
+      showToast(`✓ تمت إضافة ${data.name}`);
+
+    } else if (modalMode === 'edit') {
+      const { data, error } = await _supabase
+        .from('staff')
+        .update({ name, department })
+        .eq('id', editStaffId)
+        .select('id, name, is_active, created_at, department')
+        .single();
+
+      if (error) {
+        errorEl.textContent = 'فشل الحفظ، حاول مرة أخرى';
+        errorEl.classList.remove('hidden');
+        saveBtn.disabled = false;
+        return;
+      }
+
+      const idx = STAFF.findIndex(s => s.id === editStaffId);
+      if (idx !== -1) STAFF[idx] = data;
+      STAFF.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+      closeStaffModal();
+      renderStaffList();
+      showToast(`✓ تم تحديث بيانات الموظف`);
+    }
+
+    saveBtn.disabled = false;
+  }
+
+  // ===== Soft-Delete (US5) =====
+
+  function showDeleteConfirm(staffId) {
+    deleteConfirmId = staffId;
+    renderStaffList();
+  }
+
+  function cancelDelete() {
+    deleteConfirmId = null;
+    renderStaffList();
+  }
+
+  async function confirmDelete(staffId) {
+    const { error } = await _supabase
+      .from('staff')
+      .update({ is_active: false })
+      .eq('id', staffId);
+
+    if (error) {
+      showToast('❌ فشل الحجب، حاول مرة أخرى', true);
+      deleteConfirmId = null;
+      renderStaffList();
+      return;
+    }
+
+    const idx = STAFF.findIndex(s => s.id === staffId);
+    if (idx !== -1) STAFF[idx].is_active = false;
+    deleteConfirmId = null;
+    renderStaffList();
+    showToast('تم حجب الموظف ✓');
+  }
+
+  // ===== Events Section (US1, US2) =====
+
+  async function loadEvents() {
+    document.getElementById('eventsList').innerHTML =
+      '<div class="loading-state">جارٍ التحميل...</div>';
+
+    const { data, error } = await _supabase
+      .from('events')
+      .select('id, name, event_date, is_active, start_time')
+      .order('event_date', { ascending: false });
+
+    if (error) {
+      document.getElementById('eventsList').innerHTML =
+        '<div class="error-state">تعذّر تحميل الفعاليات</div>';
+      return;
+    }
+
+    EVENTS = data || [];
+    renderEventsList();
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
+  }
+
+  function renderEventsList() {
+    const list = document.getElementById('eventsList');
+    list.innerHTML = '';
+
+    if (EVENTS.length === 0) {
+      list.innerHTML = '<div class="empty-state">لا توجد فعاليات — أنشئ فعالية ＋</div>';
+      return;
+    }
+
+    EVENTS.forEach(ev => {
+      const card = document.createElement('div');
+      card.className = `event-card${ev.is_active ? ' active-event' : ''}`;
+
+      const isConfirming = deleteConfirmEventId === ev.id;
+
+      const actionsHTML = isConfirming
+        ? `<div class="delete-confirm">
+             <button class="btn-confirm-delete" onclick="confirmDeleteEvent('${ev.id}')">تأكيد الحذف</button>
+             <button class="btn-cancel-delete" onclick="cancelDeleteEvent()">إلغاء</button>
+           </div>`
+        : `<div class="card-actions">
+             <button class="btn-icon" title="تعديل" onclick="openEventModal('edit', ${JSON.stringify(ev).replace(/"/g, '&quot;')})">✏️</button>
+             ${!ev.is_active
+               ? `<button class="btn-activate" onclick="activateEvent('${ev.id}')">تفعيل</button>`
+               : ''}
+             <button class="btn-icon danger" title="حذف" onclick="deleteEvent('${ev.id}')">🗑️</button>
+           </div>`;
+
+      card.innerHTML = `
+        <div class="event-info">
+          <div class="event-name">${ev.name}</div>
+          <div class="event-date">${formatDate(ev.event_date)}${ev.start_time ? ' · ' + ev.start_time.slice(0,5) : ''}</div>
+          <span class="event-status ${ev.is_active ? 'active' : 'inactive'}">${ev.is_active ? 'نشطة' : 'غير نشطة'}</span>
+        </div>
+        ${actionsHTML}
+      `;
+
+      list.appendChild(card);
+    });
+  }
+
+  function openEventModal(mode, ev = null) {
+    eventModalMode = mode;
+    editEventId = ev ? ev.id : null;
+    document.getElementById('eventModalTitle').textContent =
+      mode === 'add' ? 'إنشاء فعالية' : 'تعديل الفعالية';
+    document.getElementById('eventNameInput').value = ev ? ev.name : '';
+    document.getElementById('eventDateInput').value = ev ? (ev.event_date || '') : '';
+    document.getElementById('eventStartTimeInput').value = ev ? (ev.start_time ? ev.start_time.slice(0,5) : '') : '';
+    document.getElementById('eventModalError').classList.add('hidden');
+    document.getElementById('eventModalError').textContent = '';
+    document.getElementById('eventModal').classList.add('active');
+    setTimeout(() => document.getElementById('eventNameInput').focus(), 50);
+  }
+
+  function closeEventModal() {
+    document.getElementById('eventModal').classList.remove('active');
+    eventModalMode = null;
+    editEventId = null;
+    document.getElementById('eventNameInput').value = '';
+    document.getElementById('eventDateInput').value = '';
+    document.getElementById('eventStartTimeInput').value = '';
+    document.getElementById('eventModalError').classList.add('hidden');
+  }
+
+  async function submitEventModal() {
+    const name = document.getElementById('eventNameInput').value.trim();
+    const eventDate = document.getElementById('eventDateInput').value;
+    const startTimeRaw = document.getElementById('eventStartTimeInput').value.trim();
+    const startTime = startTimeRaw || null;
+    const errorEl = document.getElementById('eventModalError');
+
+    if (!name) {
+      errorEl.textContent = 'يرجى إدخال اسم الفعالية';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    if (!eventDate) {
+      errorEl.textContent = 'يرجى تحديد تاريخ الفعالية';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    const saveBtn = document.querySelector('#eventModal .btn-primary');
+    saveBtn.disabled = true;
+
+    if (eventModalMode === 'add') {
+      const { data, error } = await _supabase
+        .from('events')
+        .insert({ name, event_date: eventDate, start_time: startTime })
+        .select('id, name, event_date, is_active, start_time')
+        .single();
+
+      if (error) {
+        errorEl.textContent = 'فشل الحفظ، حاول مرة أخرى';
+        errorEl.classList.remove('hidden');
+        saveBtn.disabled = false;
+        return;
+      }
+
+      EVENTS.push(data);
+      EVENTS.sort((a, b) => (b.event_date || '').localeCompare(a.event_date || ''));
+      closeEventModal();
+      renderEventsList();
+      showToast('تمت إضافة الفعالية ✓');
+
+    } else if (eventModalMode === 'edit') {
+      const { data, error } = await _supabase
+        .from('events')
+        .update({ name, event_date: eventDate, start_time: startTime })
+        .eq('id', editEventId)
+        .select('id, name, event_date, is_active, start_time')
+        .single();
+
+      if (error) {
+        errorEl.textContent = 'فشل الحفظ، حاول مرة أخرى';
+        errorEl.classList.remove('hidden');
+        saveBtn.disabled = false;
+        return;
+      }
+
+      const idx = EVENTS.findIndex(e => e.id === editEventId);
+      if (idx !== -1) EVENTS[idx] = data;
+      EVENTS.sort((a, b) => (b.event_date || '').localeCompare(a.event_date || ''));
+      closeEventModal();
+      renderEventsList();
+      showToast('تم تحديث الفعالية ✓');
+    }
+
+    saveBtn.disabled = false;
+  }
+
+  async function activateEvent(eventId) {
+    await _supabase.from('events').update({ is_active: false }).eq('is_active', true);
+    const { error } = await _supabase.from('events').update({ is_active: true }).eq('id', eventId);
+    if (error) { showToast('❌ فشل التفعيل', true); return; }
+    EVENTS.forEach(e => { e.is_active = e.id === eventId; });
+    renderEventsList();
+    showToast('تم تفعيل الفعالية ✓');
+  }
+
+  async function deleteEvent(eventId) {
+    const { count, error } = await _supabase
+      .from('attendance')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_id', eventId);
+
+    if (error) { showToast('❌ خطأ في التحقق', true); return; }
+    if (count > 0) {
+      showToast('❌ لا يمكن حذف فعالية لها سجلات حضور', true);
+      return;
+    }
+    deleteConfirmEventId = eventId;
+    renderEventsList();
+  }
+
+  async function confirmDeleteEvent(eventId) {
+    const { error } = await _supabase.from('events').delete().eq('id', eventId);
+    if (error) { showToast('❌ فشل الحذف', true); deleteConfirmEventId = null; renderEventsList(); return; }
+    EVENTS = EVENTS.filter(e => e.id !== eventId);
+    deleteConfirmEventId = null;
+    renderEventsList();
+    showToast('تم حذف الفعالية ✓');
+  }
+
+  function cancelDeleteEvent() {
+    deleteConfirmEventId = null;
+    renderEventsList();
+  }
+
+  // ===== Attendance Section (US3, US4, US5) =====
+
+  function isLate(checkedInAt, startTime) {
+    if (!startTime) return false;
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const checkedDate = new Date(checkedInAt);
+    const startCopy = new Date(checkedDate);
+    startCopy.setHours(hours, minutes, 0, 0);
+    return checkedDate > startCopy;
+  }
+
+  async function loadAttendance() {
+    if (EVENTS.length === 0) {
+      document.getElementById('attendanceStats').innerHTML = '';
+      document.getElementById('attendanceTableContainer').innerHTML =
+        '<div class="empty-state">لا توجد فعاليات — أنشئ فعالية أولاً</div>';
+      return;
+    }
+
+    if (!selectedEventId) {
+      const active = EVENTS.find(e => e.is_active);
+      selectedEventId = active ? active.id : EVENTS[0].id;
+    }
+
+    // Populate event selector
+    const selector = document.getElementById('eventSelector');
+    selector.innerHTML = '';
+    EVENTS.forEach(ev => {
+      const opt = document.createElement('option');
+      opt.value = ev.id;
+      opt.textContent = (ev.is_active ? '● ' : '') + ev.name;
+      if (ev.id === selectedEventId) opt.selected = true;
+      selector.appendChild(opt);
+    });
+
+    // Wire selector change (idempotent — remove then add)
+    selector.onchange = e => { selectedEventId = e.target.value; loadAttendance(); };
+
+    document.getElementById('attendanceTableContainer').innerHTML =
+      '<div class="loading-state">جارٍ التحميل...</div>';
+
+    const { data, error } = await _supabase
+      .from('attendance')
+      .select('id, checked_in_at, checked_out_at, staff:staff_id(name)')
+      .eq('event_id', selectedEventId)
+      .order('checked_in_at')
+      .limit(200);
+
+    if (error) {
+      document.getElementById('attendanceTableContainer').innerHTML =
+        '<div class="error-state">تعذّر تحميل سجلات الحضور</div>';
+      return;
+    }
+
+    ATTENDANCE = data || [];
+    renderAttendanceTable();
+    renderAttendanceStats();
+  }
+
+  function renderAttendanceTable() {
+    const container = document.getElementById('attendanceTableContainer');
+    const selectedEvent = EVENTS.find(e => e.id === selectedEventId);
+    const startTime = selectedEvent ? selectedEvent.start_time : null;
+
+    const filtered = attendanceSearch
+      ? ATTENDANCE.filter(r => r.staff && r.staff.name && r.staff.name.includes(attendanceSearch))
+      : ATTENDANCE;
+
+    if (ATTENDANCE.length === 0) {
+      container.innerHTML = '<div class="empty-state">لا توجد سجلات حضور لهذه الفعالية</div>';
+      return;
+    }
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<div class="empty-state">لا توجد نتائج للبحث</div>';
+      return;
+    }
+
+    let rows = filtered.map(r => {
+      const name = r.staff ? r.staff.name : '—';
+      const checkedDate = new Date(r.checked_in_at);
+      const timeStr = checkedDate.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+      const late = isLate(r.checked_in_at, startTime);
+      const checkoutStr = r.checked_out_at
+        ? new Date(r.checked_out_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+        : '—';
+      return `<tr>
+        <td>${name}</td>
+        <td>${timeStr}${late ? '<span class="late-badge">متأخر</span>' : ''}</td>
+        <td>${checkoutStr}</td>
+      </tr>`;
+    }).join('');
+
+    const capNote = ATTENDANCE.length === 200
+      ? '<p class="cap-note">⚠️ يُعرض أول 200 سجل فقط</p>' : '';
+
+    container.innerHTML = `
+      <table class="attendance-table">
+        <thead><tr><th>الاسم</th><th>وقت الحضور</th><th>وقت الانصراف</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${capNote}
+    `;
+  }
+
+  function renderAttendanceStats() {
+    const total = STAFF.filter(s => s.is_active).length;
+    const present = ATTENDANCE.length;
+    const absent = total - present;
+    const rate = total === 0 ? 0 : Math.round(present / total * 100);
+
+    document.getElementById('attendanceStats').innerHTML = `
+      <div class="stat-block">
+        <div class="stat-value">${total}</div>
+        <div class="stat-label">الإجمالي</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-value" style="color:var(--accent)">${present}</div>
+        <div class="stat-label">الحضور</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-value" style="color:var(--danger)">${absent < 0 ? 0 : absent}</div>
+        <div class="stat-label">الغياب</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-value">${rate}%</div>
+        <div class="stat-label">نسبة الحضور</div>
+      </div>
+    `;
+  }
+
+  // ===== Export Section (US1) =====
+
+  function safeFilename(eventName) {
+    return (eventName || '').replace(/\s+/g, '-').replace(/[^\u0600-\u06FF\w-]/g, '') || 'attendance';
+  }
+
+  function loadExport() {
+    const selector = document.getElementById('exportEventSelector');
+    const preview = document.getElementById('exportPreview');
+
+    if (EVENTS.length === 0) {
+      preview.textContent = 'لا توجد فعاليات — أنشئ فعالية أولاً';
+      ['btnExportCSV','btnExportText','btnExportPDF'].forEach(id => {
+        document.getElementById(id).disabled = true;
+      });
+      return;
+    }
+
+    if (!exportSelectedEventId) {
+      const active = EVENTS.find(e => e.is_active);
+      exportSelectedEventId = active ? active.id : EVENTS[0].id;
+    }
+
+    selector.innerHTML = '';
+    EVENTS.forEach(ev => {
+      const opt = document.createElement('option');
+      opt.value = ev.id;
+      opt.textContent = (ev.is_active ? '● ' : '') + ev.name;
+      if (ev.id === exportSelectedEventId) opt.selected = true;
+      selector.appendChild(opt);
+    });
+    selector.onchange = e => { exportSelectedEventId = e.target.value; updateExportPreview(); };
+
+    updateExportPreview();
+  }
+
+  async function updateExportPreview() {
+    const { count, error } = await _supabase
+      .from('attendance')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_id', exportSelectedEventId);
+
+    exportRecordCount = error ? 0 : (count || 0);
+    document.getElementById('exportPreview').textContent = `سيتم تصدير ${exportRecordCount} سجل`;
+    const disabled = exportRecordCount === 0;
+    ['btnExportCSV','btnExportText','btnExportPDF'].forEach(id => {
+      document.getElementById(id).disabled = disabled;
+    });
+  }
+
+  async function exportCSV() {
+    if (exportRecordCount === 0) { showToast('❌ لا توجد سجلات للتصدير', true); return; }
+    const { data, error } = await _supabase
+      .from('attendance')
+      .select('checked_in_at, checked_out_at, staff:staff_id(name)')
+      .eq('event_id', exportSelectedEventId)
+      .order('checked_in_at');
+    if (error) { showToast('❌ فشل التصدير', true); return; }
+
+    const ev = EVENTS.find(e => e.id === exportSelectedEventId);
+    const BOM = '\uFEFF';
+    const header = '"الاسم","وقت الحضور","وقت الانصراف"';
+    const rows = (data || []).map(r => {
+      const name = r.staff ? r.staff.name : '';
+      const time = new Date(r.checked_in_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+      const checkoutTime = r.checked_out_at
+        ? new Date(r.checked_out_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+        : '';
+      return `"${name}","${time}","${checkoutTime}"`;
+    });
+    const csv = BOM + header + '\n' + rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeFilename(ev ? ev.name : 'attendance')}-attendance.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportText() {
+    if (exportRecordCount === 0) { showToast('❌ لا توجد سجلات للتصدير', true); return; }
+    const { data, error } = await _supabase
+      .from('attendance')
+      .select('checked_in_at, staff:staff_id(name)')
+      .eq('event_id', exportSelectedEventId)
+      .order('checked_in_at');
+    if (error) { showToast('❌ فشل التصدير', true); return; }
+
+    const ev = EVENTS.find(e => e.id === exportSelectedEventId);
+    const evName = ev ? ev.name : '';
+    const evDate = ev ? formatDate(ev.event_date) : '';
+    const lines = [
+      `تقرير الحضور — ${evName}`,
+      `التاريخ: ${evDate}`,
+      `إجمالي الحضور: ${(data || []).length} موظف`,
+      '─────────────────',
+      ...(data || []).map((r, i) => {
+        const name = r.staff ? r.staff.name : '—';
+        const time = new Date(r.checked_in_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+        return `${i + 1}. ${name} — ${time}`;
+      })
+    ];
+    const text = lines.join('\n');
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `تقرير — ${evName}`, text });
+      } else {
+        await navigator.clipboard.writeText(text);
+        showToast('تم نسخ التقرير ✓');
+      }
+    } catch {
+      showToast('❌ فشل المشاركة', true);
+    }
+  }
+
+  async function exportPDF() {
+    if (exportRecordCount === 0) { showToast('❌ لا توجد سجلات للتصدير', true); return; }
+    const { data, error } = await _supabase
+      .from('attendance')
+      .select('checked_in_at, checked_out_at, signature_data, exit_signature_data, staff:staff_id(name)')
+      .eq('event_id', exportSelectedEventId)
+      .order('checked_in_at');
+    if (error) { showToast('❌ فشل التصدير', true); return; }
+
+    const ev = EVENTS.find(e => e.id === exportSelectedEventId);
+    const evName = ev ? ev.name : '';
+    const evDate = ev ? formatDate(ev.event_date) : '';
+    const rows = (data || []).map((r, i) => {
+      const name = r.staff ? r.staff.name : '—';
+      const time = new Date(r.checked_in_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+      const sigCell = r.signature_data
+        ? `<img src="${r.signature_data}" style="max-height:40px;max-width:80px">`
+        : '';
+      const checkoutTime = r.checked_out_at
+        ? new Date(r.checked_out_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+        : '—';
+      const exitSigCell = r.exit_signature_data
+        ? `<img src="${r.exit_signature_data}" style="max-height:40px;max-width:80px">`
+        : '';
+      return `<tr><td>${i+1}</td><td>${name}</td><td>${time}</td><td>${sigCell}</td><td>${checkoutTime}</td><td>${exitSigCell}</td></tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family:'Tajawal',sans-serif; padding:20px; }
+  h1 { font-size:18px; margin-bottom:4px; }
+  p { font-size:13px; color:#666; margin-bottom:16px; }
+  table { width:100%; border-collapse:collapse; }
+  th,td { border:1px solid #ddd; padding:8px; text-align:right; font-size:13px; }
+  th { background:#f5f5f5; font-size:12px; }
+  @media print { body { padding:0; } }
+</style></head><body>
+<h1>تقرير الحضور — ${evName}</h1>
+<p>التاريخ: ${evDate} · الإجمالي: ${(data||[]).length} موظف</p>
+<table>
+  <thead><tr><th>#</th><th>الاسم</th><th>وقت الحضور</th><th>توقيع الدخول</th><th>وقت الانصراف</th><th>توقيع الخروج</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+</body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) { showToast('❌ السماح بالنوافذ المنبثقة مطلوب', true); return; }
+    w.document.write(html);
+    w.document.close();
+    w.onload = () => { w.focus(); w.print(); };
+  }
+
+  // ===== Settings Section (US2, US3) =====
+
+  function loadSettings() {
+    document.getElementById('themeToggle').checked =
+      document.documentElement.classList.contains('light-theme');
+    clearPinChangeForm();
+  }
+
+  function clearPinChangeForm() {
+    ['currentPinInput','newPinInput','confirmPinInput'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    const errEl = document.getElementById('pinChangeError');
+    errEl.textContent = '';
+    errEl.classList.add('hidden');
+    document.getElementById('btnSavePin').disabled = true;
+  }
+
+  async function submitPinChange() {
+    const currentPin = document.getElementById('currentPinInput').value;
+    const newPin = document.getElementById('newPinInput').value;
+    const confirmPin = document.getElementById('confirmPinInput').value;
+    const errEl = document.getElementById('pinChangeError');
+
+    const showPinErr = msg => {
+      errEl.textContent = msg;
+      errEl.classList.remove('hidden');
+    };
+
+    if (!/^\d{4}$/.test(newPin)) { showPinErr('يجب أن يتكون PIN الجديد من 4 أرقام'); return; }
+    if (newPin !== confirmPin) { showPinErr('رمزا PIN غير متطابقَين'); return; }
+
+    const saveBtn = document.getElementById('btnSavePin');
+    saveBtn.disabled = true;
+    errEl.classList.add('hidden');
+
+    const currentHash = await hashPin(currentPin);
+    const { data, error } = await _supabase.from('settings').select('pin_hash').eq('id', 1).single();
+    if (error || !data) { showPinErr('خطأ في الاتصال، حاول مرة أخرى'); saveBtn.disabled = false; return; }
+    if (currentHash !== data.pin_hash) { showPinErr('رمز PIN الحالي غير صحيح'); saveBtn.disabled = false; return; }
+
+    const newHash = await hashPin(newPin);
+    const { error: updateErr } = await _supabase.from('settings').update({ pin_hash: newHash }).eq('id', 1);
+    if (updateErr) { showPinErr('فشل الحفظ، حاول مرة أخرى'); saveBtn.disabled = false; return; }
+
+    showToast('تم تغيير رمز PIN بنجاح ✓');
+    clearPinChangeForm();
+  }
+
+  function toggleTheme() {
+    const isLight = document.documentElement.classList.toggle('light-theme');
+    localStorage.setItem('booth_theme', isLight ? 'light' : 'dark');
+  }
+
+  // ===== Boot =====
+  document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

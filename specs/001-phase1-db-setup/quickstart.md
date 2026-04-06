@@ -85,18 +85,36 @@ Expected results:
 
 ---
 
-## Step 6: Test RLS Policies
+## Step 6: Test RLS Policies from the Browser
 
-Open the project in a browser (open `booth-attendance.html` locally with `config.js` in place).
+> **Note**: The Supabase client is not wired into `booth-attendance.html` until Phase 2. Use the self-contained snippet below to test the connection independently right now.
 
-- The staff grid should load from Supabase (replace the hardcoded list — this is Phase 2 work, but you can test the connection independently by opening the browser console and running):
+Open `booth-attendance.html` in a browser, open the browser console (F12), and paste this snippet (replace the URL and key with your values from `config.js`):
 
 ```js
-const { data } = await supabase.from('staff').select('*').eq('is_active', true);
-console.log(data);
+// Load Supabase JS from CDN
+const script = document.createElement('script');
+script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+document.head.appendChild(script);
+await new Promise(r => script.onload = r);
+
+// Initialize client
+const client = supabase.createClient(
+  'https://your-project-id.supabase.co',  // ← your SUPABASE_URL
+  'your-anon-key-here'                    // ← your SUPABASE_ANON_KEY
+);
+const client = supabase.createClient(
+  'https://uqrtmimxcypzhhwyjjtb.supabase.co',  // ← your SUPABASE_URL
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcnRtaW14Y3lwemhod3lqanRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMzkyNDgsImV4cCI6MjA5MDgxNTI0OH0.JJy6847RcTJSER04CF4jDY88aDDY7jAZZlFUehl_y10'                    // ← your SUPABASE_ANON_KEY
+);
+
+// Test: read staff (should return 5 rows)
+const { data, error } = await client.from('staff').select('*').eq('is_active', true);
+console.log('Staff:', data);
+console.log('Error:', error);
 ```
 
-You should see the 5 seed staff members.
+Expected: `Staff` logs an array of 5 objects, `Error` is `null`.
 
 ---
 
