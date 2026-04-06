@@ -837,6 +837,7 @@
   <div id="section-export" class="tab-section hidden">
     <div class="toolbar">
       <select id="exportEventSelector" class="event-select"></select>
+      <input id="exportDayPicker" class="event-select" type="date" style="width:auto;">
     </div>
     <div id="exportPreview" class="export-preview"></div>
     <div class="export-actions">
@@ -1734,16 +1735,34 @@
       if (ev.id === exportSelectedEventId) opt.selected = true;
       selector.appendChild(opt);
     });
-    selector.onchange = e => { exportSelectedEventId = e.target.value; updateExportPreview(); };
+    selector.onchange = e => { exportSelectedEventId = e.target.value; loadExport(); };
+
+    // Set up day picker within selected event's date range
+    const selectedEvent = EVENTS.find(e => e.id === exportSelectedEventId);
+    const exportPicker = document.getElementById('exportDayPicker');
+    if (selectedEvent) {
+      exportPicker.min = selectedEvent.event_date;
+      exportPicker.max = selectedEvent.end_date || selectedEvent.event_date;
+      const todayStr = new Date().toISOString().split('T')[0];
+      const currentVal = exportPicker.value;
+      if (!currentVal || currentVal < exportPicker.min || currentVal > exportPicker.max) {
+        exportPicker.value = (todayStr >= exportPicker.min && todayStr <= exportPicker.max)
+          ? todayStr : exportPicker.min;
+      }
+    }
+    exportPicker.onchange = () => updateExportPreview();
 
     updateExportPreview();
   }
 
   async function updateExportPreview() {
-    const { count, error } = await _supabase
+    const pickedDate = document.getElementById('exportDayPicker').value;
+    let query = _supabase
       .from('attendance')
       .select('id', { count: 'exact', head: true })
       .eq('event_id', exportSelectedEventId);
+    if (pickedDate) query = query.eq('attendance_date', pickedDate);
+    const { count, error } = await query;
 
     exportRecordCount = error ? 0 : (count || 0);
     document.getElementById('exportPreview').textContent = `سيتم تصدير ${exportRecordCount} سجل`;
@@ -1755,11 +1774,12 @@
 
   async function exportCSV() {
     if (exportRecordCount === 0) { showToast('❌ لا توجد سجلات للتصدير', true); return; }
-    const { data, error } = await _supabase
-      .from('attendance')
+    const pickedDate = document.getElementById('exportDayPicker').value;
+    let q = _supabase.from('attendance')
       .select('checked_in_at, checked_out_at, staff:staff_id(name)')
-      .eq('event_id', exportSelectedEventId)
-      .order('checked_in_at');
+      .eq('event_id', exportSelectedEventId).order('checked_in_at');
+    if (pickedDate) q = q.eq('attendance_date', pickedDate);
+    const { data, error } = await q;
     if (error) { showToast('❌ فشل التصدير', true); return; }
 
     const ev = EVENTS.find(e => e.id === exportSelectedEventId);
@@ -1785,16 +1805,17 @@
 
   async function exportText() {
     if (exportRecordCount === 0) { showToast('❌ لا توجد سجلات للتصدير', true); return; }
-    const { data, error } = await _supabase
-      .from('attendance')
+    const pickedDate = document.getElementById('exportDayPicker').value;
+    let q = _supabase.from('attendance')
       .select('checked_in_at, staff:staff_id(name)')
-      .eq('event_id', exportSelectedEventId)
-      .order('checked_in_at');
+      .eq('event_id', exportSelectedEventId).order('checked_in_at');
+    if (pickedDate) q = q.eq('attendance_date', pickedDate);
+    const { data, error } = await q;
     if (error) { showToast('❌ فشل التصدير', true); return; }
 
     const ev = EVENTS.find(e => e.id === exportSelectedEventId);
     const evName = ev ? ev.name : '';
-    const evDate = ev ? formatDate(ev.event_date) : '';
+    const evDate = pickedDate ? formatDate(pickedDate) : (ev ? formatDate(ev.event_date) : '');
     const lines = [
       `تقرير الحضور — ${evName}`,
       `التاريخ: ${evDate}`,
@@ -1821,16 +1842,17 @@
 
   async function exportPDF() {
     if (exportRecordCount === 0) { showToast('❌ لا توجد سجلات للتصدير', true); return; }
-    const { data, error } = await _supabase
-      .from('attendance')
+    const pickedDate = document.getElementById('exportDayPicker').value;
+    let q = _supabase.from('attendance')
       .select('checked_in_at, checked_out_at, signature_data, exit_signature_data, staff:staff_id(name)')
-      .eq('event_id', exportSelectedEventId)
-      .order('checked_in_at');
+      .eq('event_id', exportSelectedEventId).order('checked_in_at');
+    if (pickedDate) q = q.eq('attendance_date', pickedDate);
+    const { data, error } = await q;
     if (error) { showToast('❌ فشل التصدير', true); return; }
 
     const ev = EVENTS.find(e => e.id === exportSelectedEventId);
     const evName = ev ? ev.name : '';
-    const evDate = ev ? formatDate(ev.event_date) : '';
+    const evDate = pickedDate ? formatDate(pickedDate) : (ev ? formatDate(ev.event_date) : '');
     const rows = (data || []).map((r, i) => {
       const name = r.staff ? r.staff.name : '—';
       const time = new Date(r.checked_in_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
