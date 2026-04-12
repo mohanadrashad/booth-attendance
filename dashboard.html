@@ -1758,7 +1758,7 @@
     const allDays = document.getElementById('exportAllDays').checked;
     const pickedDate = allDays ? null : document.getElementById('attendanceDayPicker').value;
     let q = _supabase.from('attendance')
-      .select('checked_in_at, checked_out_at, staff:staff_id(name)')
+      .select('staff_id, checked_in_at, checked_out_at, staff:staff_id(name)')
       .eq('event_id', selectedEventId).order('checked_in_at');
     if (pickedDate) q = q.eq('attendance_date', pickedDate);
     const { data, error } = await q;
@@ -1767,15 +1767,25 @@
 
     const ev = EVENTS.find(e => e.id === selectedEventId);
     const BOM = '\uFEFF';
-    const header = '"الاسم","وقت الحضور","وقت الانصراف"';
+    const header = '"الاسم","وقت الحضور","وقت الانصراف","الحالة"';
     const rows = (data || []).map(r => {
       const name = r.staff ? r.staff.name : '';
       const time = new Date(r.checked_in_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
       const checkoutTime = r.checked_out_at
         ? new Date(r.checked_out_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
         : '';
-      return `"${name}","${time}","${checkoutTime}"`;
+      return `"${name}","${time}","${checkoutTime}","حاضر"`;
     });
+
+    // Add absent staff (only for single day export)
+    if (pickedDate) {
+      const presentIds = new Set((data || []).map(r => r.staff_id));
+      const absentStaff = STAFF.filter(s => s.is_active && !presentIds.has(s.id));
+      absentStaff.forEach(s => {
+        rows.push(`"${s.name}","","","غائب"`);
+      });
+    }
+
     const csv = BOM + header + '\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -1790,7 +1800,7 @@
     const allDays = document.getElementById('exportAllDays').checked;
     const pickedDate = allDays ? null : document.getElementById('attendanceDayPicker').value;
     let q = _supabase.from('attendance')
-      .select('checked_in_at, staff:staff_id(name)')
+      .select('staff_id, checked_in_at, staff:staff_id(name)')
       .eq('event_id', selectedEventId).order('checked_in_at');
     if (pickedDate) q = q.eq('attendance_date', pickedDate);
     const { data, error } = await q;
@@ -1803,6 +1813,22 @@
       : (ev && ev.end_date && ev.end_date !== ev.event_date
           ? formatDate(ev.event_date) + ' – ' + formatDate(ev.end_date)
           : (ev ? formatDate(ev.event_date) : ''));
+
+    // Build absent staff list (only for single day)
+    let absentSection = [];
+    if (pickedDate) {
+      const presentIds = new Set((data || []).map(r => r.staff_id));
+      const absentStaff = STAFF.filter(s => s.is_active && !presentIds.has(s.id));
+      if (absentStaff.length > 0) {
+        absentSection = [
+          '',
+          `الغائبون: ${absentStaff.length} موظف`,
+          '─────────────────',
+          ...absentStaff.map((s, i) => `${i + 1}. ${s.name}`)
+        ];
+      }
+    }
+
     const lines = [
       `تقرير الحضور — ${evName}`,
       `التاريخ: ${evDate}`,
@@ -1812,7 +1838,8 @@
         const name = r.staff ? r.staff.name : '—';
         const time = new Date(r.checked_in_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
         return `${i + 1}. ${name} — ${time}`;
-      })
+      }),
+      ...absentSection
     ];
     const text = lines.join('\n');
     try {
@@ -1831,7 +1858,7 @@
     const allDays = document.getElementById('exportAllDays').checked;
     const pickedDate = allDays ? null : document.getElementById('attendanceDayPicker').value;
     let q = _supabase.from('attendance')
-      .select('checked_in_at, checked_out_at, signature_data, exit_signature_data, staff:staff_id(name)')
+      .select('staff_id, checked_in_at, checked_out_at, signature_data, exit_signature_data, staff:staff_id(name)')
       .eq('event_id', selectedEventId).order('checked_in_at');
     if (pickedDate) q = q.eq('attendance_date', pickedDate);
     const { data, error } = await q;
@@ -1859,6 +1886,21 @@
       return `<tr><td>${i+1}</td><td>${name}</td><td>${time}</td><td>${sigCell}</td><td>${checkoutTime}</td><td>${exitSigCell}</td></tr>`;
     }).join('');
 
+    // Build absent staff section (only for single day)
+    let absentSection = '';
+    if (pickedDate) {
+      const presentIds = new Set((data || []).map(r => r.staff_id));
+      const absentStaff = STAFF.filter(s => s.is_active && !presentIds.has(s.id));
+      if (absentStaff.length > 0) {
+        absentSection = `
+          <h2 style="font-size:16px;margin-top:24px;margin-bottom:8px;color:#dc2626;">الغائبون (${absentStaff.length})</h2>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            ${absentStaff.map(s => `<span style="background:#fef2f2;color:#dc2626;padding:6px 12px;border-radius:6px;font-size:13px;">${s.name}</span>`).join('')}
+          </div>
+        `;
+      }
+    }
+
     const html = `<!DOCTYPE html><html dir="rtl" lang="ar"><head>
 <meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
@@ -1877,6 +1919,7 @@
   <thead><tr><th>#</th><th>الاسم</th><th>وقت الحضور</th><th>توقيع الدخول</th><th>وقت الانصراف</th><th>توقيع الخروج</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>
+${absentSection}
 </body></html>`;
 
     const w = window.open('', '_blank');
