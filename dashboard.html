@@ -584,6 +584,33 @@
     overflow-x: auto;
   }
 
+  .absent-section {
+    padding: 14px 16px;
+    border-top: 1px solid var(--card-border);
+  }
+
+  .absent-header {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--danger);
+    margin-bottom: 10px;
+  }
+
+  .absent-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .absent-tag {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--danger);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
   .attendance-table {
     width: 100%;
     border-collapse: collapse;
@@ -1604,7 +1631,7 @@
 
     const { data, error } = await _supabase
       .from('attendance')
-      .select('id, checked_in_at, checked_out_at, attendance_date, staff:staff_id(name)')
+      .select('id, staff_id, checked_in_at, checked_out_at, attendance_date, staff:staff_id(name)')
       .eq('event_id', selectedEventId)
       .order('checked_in_at')
       .limit(200);
@@ -1663,12 +1690,25 @@
     const capNote = ATTENDANCE.length === 200
       ? '<p class="cap-note">⚠️ يُعرض أول 200 سجل فقط</p>' : '';
 
+    // Build absent staff list
+    const presentStaffIds = new Set(byDay.map(r => r.staff_id));
+    const absentStaff = STAFF.filter(s => s.is_active && !presentStaffIds.has(s.id));
+    const absentSection = absentStaff.length > 0 ? `
+      <div class="absent-section">
+        <div class="absent-header">الغائبون (${absentStaff.length})</div>
+        <div class="absent-list">
+          ${absentStaff.map(s => `<span class="absent-tag">${s.name}</span>`).join('')}
+        </div>
+      </div>
+    ` : '';
+
     container.innerHTML = `
       <table class="attendance-table">
         <thead><tr><th>الاسم</th><th>وقت الحضور</th><th>وقت الانصراف</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       ${capNote}
+      ${absentSection}
     `;
   }
 
